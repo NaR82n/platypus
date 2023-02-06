@@ -107,9 +107,14 @@ var (
 		"float":      FLOAT,
 		"list":       LIST,
 		"map":        MAP,
+		"struct":     STRUCT,
+		"any":        ANY,
+		"let":        LET,
+		"fn":         FN,
 	}
 
 	ItemTypeStr = map[ItemType]string{
+		RET_SYMB:      "->",
 		LEFT_PAREN:    "(",
 		RIGHT_PAREN:   ")",
 		LEFT_BRACKET:  "[",
@@ -260,7 +265,12 @@ func lexStatements(l *Lexer) stateFn {
 		return lexSpace
 
 	case r == '-':
-		l.emit(SUB)
+		if t := l.peek(); t == '>' {
+			l.next()
+			l.emit(RET_SYMB)
+		} else {
+			l.emit(SUB)
+		}
 		return lexSpace
 
 	// case r == '^':

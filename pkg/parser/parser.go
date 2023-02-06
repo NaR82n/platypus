@@ -162,10 +162,16 @@ func (p *parser) newNilLiteral(pos plToken.Pos) *ast.Node {
 	})
 }
 
-func (p *parser) newIdentifierLiteral(name Item) *ast.Node {
+func (p *parser) newIdentifier(name Item) *ast.Node {
 	return ast.WrapIdentifier(&ast.Identifier{
 		Name:  name.Val,
 		Start: p.posCache.LnCol(name.Pos),
+	})
+}
+
+func (p *parser) newVarbDeclStmt(val Item) *ast.Node {
+	return ast.WrapVarbDecl(&ast.VarbDeclStmt{
+		LetPos: p.posCache.LnCol(val.Pos),
 	})
 }
 
@@ -184,8 +190,9 @@ func (p *parser) newParenExpr(lParen Item, node *ast.Node, rParen Item) *ast.Nod
 	})
 }
 
-func (p *parser) newListInitStartExpr(pos plToken.Pos) *ast.Node {
+func (p *parser) newListInitStartExpr(pos plToken.Pos, plT *ast.Node) *ast.Node {
 	return ast.WrapListInitExpr(&ast.ListInitExpr{
+		Type:     plT,
 		List:     []*ast.Node{},
 		LBracket: p.posCache.LnCol(pos),
 	})
@@ -212,8 +219,9 @@ func (p *parser) newListInitEndExpr(initExpr *ast.Node, pos plToken.Pos) *ast.No
 	return initExpr
 }
 
-func (p *parser) newMapInitStartExpr(pos plToken.Pos) *ast.Node {
+func (p *parser) newMapInitStartExpr(pos plToken.Pos, plT *ast.Node) *ast.Node {
 	return ast.WrapMapInitExpr(&ast.MapInitExpr{
+		Type:        plT,
 		KeyValeList: [][2]*ast.Node{},
 		LBrace:      p.posCache.LnCol(pos),
 	})
@@ -474,6 +482,92 @@ func (p *parser) newCallExpr(fn *ast.Node, args []*ast.Node, lParen, rParen Item
 	f.Param = append(f.Param, args...)
 
 	return ast.WrapCallExpr(f)
+}
+
+func (p *parser) newStructTypeDecl(idNode *ast.Node) *ast.Node {
+	return ast.WrapStructTypeDecl(&ast.StructDeclStmt{
+		Name: idNode.Identifier.Name,
+	})
+}
+
+func (p *parser) structTypeAppendField(structNode, id, plType *ast.Node) *ast.Node {
+	if structNode.NodeType != ast.TypeStructTypeDecl {
+		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
+			"%s object is not StructTypeDeclStmt", structNode.NodeType)
+		return nil
+	}
+
+	structNode.StructTypeDeclStmt.Fields = append(structNode.StructTypeDeclStmt.Fields, &ast.StructField{
+		Name: id.Identifier.Name,
+		Type: plType,
+	})
+
+	return structNode
+}
+
+func (p *parser) newFnDecl(idNode *ast.Node) *ast.Node {
+	return ast.WrapFnDecl(&ast.FuncDeclStmt{
+		Name: idNode.Identifier.Name,
+	})
+}
+
+func (p *parser) fnDeclAppenParam(fnDecl, id, plType *ast.Node) *ast.Node {
+	if fnDecl.NodeType != ast.TypeFuncDeclStmt {
+		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
+			"%s object is not FuncDeclStmt", fnDecl.NodeType)
+		return nil
+	}
+	fnDecl.FnDeclStmt.Param = append(fnDecl.FnDeclStmt.Param, &ast.FnParam{
+		Name: id.Identifier.Name,
+		Type: plType,
+	})
+	return fnDecl
+}
+
+func (p *parser) fnDeclAppenReturn(fnDecl, plType *ast.Node) *ast.Node {
+	if fnDecl.NodeType != ast.TypeFuncDeclStmt {
+		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
+			"%s object is not FuncDeclStmt", fnDecl.NodeType)
+		return nil
+	}
+	if plType != nil {
+		fnDecl.FnDeclStmt.ReturnType = append(fnDecl.FnDeclStmt.ReturnType, plType)
+	}
+	return fnDecl
+}
+
+func (p *parser) fnDeclEnd(fnDecl *ast.Node, block *ast.BlockStmt) *ast.Node {
+	if fnDecl.NodeType != ast.TypeFuncDeclStmt {
+		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
+			"%s object is not FuncDeclStmt", fnDecl.NodeType)
+		return nil
+	}
+	fnDecl.FnDeclStmt.Block = block
+	return fnDecl
+}
+func (p *parser) newNamedType(name string, pos plToken.Pos) *ast.Node {
+	return ast.WrapType(&ast.Type{
+		T: &ast.NamedType{
+			Name: name,
+		},
+	})
+}
+
+func (p *parser) newListType(vT *ast.Node) *ast.Node {
+	return ast.WrapType(&ast.Type{
+		T: &ast.ListType{
+			ValueT: vT,
+		},
+	})
+}
+
+func (p *parser) newMapType(kT, vT *ast.Node) *ast.Node {
+	return ast.WrapType(&ast.Type{
+		T: &ast.MapType{
+			KeyT:   kT,
+			ValueT: vT,
+		},
+	})
 }
 
 // end of yylex.(*parser).newXXXX

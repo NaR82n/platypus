@@ -6,6 +6,7 @@
 package ast
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/GuanceCloud/platypus/pkg/token"
@@ -22,26 +23,47 @@ func (e *IfelseStmt) IsExpr() bool {
 	return false
 }
 
-func (e *IfelseStmt) String() string {
-	arr := []string{e.IfList.String()}
-	if e.Else != nil && len(e.Else.Stmts) != 0 {
-		arr = append(arr, "else", "{", e.Else.String(), "}")
+func (e *IfelseStmt) Format() []string {
+	var lines []string
+	if e.IfList != nil {
+		lines = e.IfList.Format()
+	} else {
+		return lines
 	}
-	return strings.Join(arr, " ")
+
+	if e.Else != nil {
+		lines = nodeFAppendConnect(lines, []string{" else "})
+		lines = nodeFAppendConnect(lines, e.Else.Format())
+	}
+
+	return lines
+}
+
+func (e *IfelseStmt) String() string {
+	return strings.Join(e.Format(), "\n")
 }
 
 // IfList index [0] is IF, [1..end] is ELIF.
 type IfList []*IfStmtElem
 
-func (e IfList) String() string {
+func (e IfList) Format() []string {
+	lines := []string{}
 	if len(e) == 0 {
-		return ""
+		return lines
 	}
-	arr := []string{"if", e[0].String()}
+	lines = append(lines, "if ")
+	lines = nodeFAppendConnect(lines, e[0].Format())
+
 	for i := 1; i < len(e); i++ {
-		arr = append(arr, "elif", e[i].String())
+		lines = nodeFAppendConnect(lines, []string{" elif "})
+		lines = nodeFAppendConnect(lines, e[i].Format())
 	}
-	return strings.Join(arr, " ")
+
+	return lines
+}
+
+func (e IfList) String() string {
+	return strings.Join(e.Format(), "\n")
 }
 
 type IfStmtElem struct {
@@ -51,13 +73,27 @@ type IfStmtElem struct {
 	Start token.LnColPos
 }
 
+func (e *IfStmtElem) Format() []string {
+	lines := e.Condition.Format()
+	lines = nodeFAppendConnect(lines, []string{" "})
+	if e.Block != nil {
+		lines = nodeFAppendConnect(lines, e.Block.Format())
+	} else {
+		lines = nodeFAppendConnect(lines, []string{"{\n}"})
+	}
+	return lines
+}
+
 func (e *IfStmtElem) String() string {
-	arr := []string{e.Condition.String(), "{", e.Block.String(), "}"}
-	return strings.Join(arr, " ")
+	return strings.Join(e.Format(), "\n")
 }
 
 type BreakStmt struct {
 	Start token.LnColPos
+}
+
+func (e *BreakStmt) Format() []string {
+	return []string{"break"}
 }
 
 func (e *BreakStmt) String() string {
@@ -66,6 +102,10 @@ func (e *BreakStmt) String() string {
 
 type ContinueStmt struct {
 	Start token.LnColPos
+}
+
+func (e *ContinueStmt) Format() []string {
+	return []string{"continue"}
 }
 
 func (e *ContinueStmt) String() string {
@@ -81,8 +121,27 @@ type ForInStmt struct {
 	InPos  token.LnColPos
 }
 
+func (e *ForInStmt) Format() []string {
+	lines := []string{"for "}
+
+	if e.Varb != nil {
+		lines = nodeFAppendConnect(lines, e.Varb.Format())
+	}
+	lines[len(lines)-1] += " in "
+
+	if e.Iter != nil {
+		lines = nodeFAppendConnect(lines, e.Iter.Format())
+	}
+
+	lines[len(lines)-1] += " {"
+	lines = nodeFAppendTab(lines, e.Body.Format())
+	lines = append(lines, "}")
+
+	return lines
+}
+
 func (e *ForInStmt) String() string {
-	return "for in stmt"
+	return strings.Join(e.Format(), "\n")
 }
 
 type ForStmt struct {
@@ -101,8 +160,33 @@ type ForStmt struct {
 	ForPos token.LnColPos
 }
 
+func (e *ForStmt) Format() []string {
+	lines := []string{"for "}
+
+	if e.Init != nil {
+		lines = nodeFAppendConnect(lines, e.Init.Format())
+	}
+	lines[len(lines)-1] += "; "
+
+	if e.Cond != nil {
+		lines = nodeFAppendConnect(lines, e.Cond.Format())
+	}
+	lines[len(lines)-1] += "; "
+
+	if e.Loop != nil {
+		lines = nodeFAppendConnect(lines, e.Loop.Format())
+		lines[len(lines)-1] += " "
+	}
+
+	lines[len(lines)-1] += " {"
+	lines = nodeFAppendTab(lines, e.Body.Format())
+	lines = append(lines, "}")
+
+	return lines
+}
+
 func (e *ForStmt) String() string {
-	return "for stmt"
+	return strings.Join(e.Format(), "\n")
 }
 
 type BlockStmt struct {
@@ -111,6 +195,159 @@ type BlockStmt struct {
 	Stmts     Stmts
 }
 
+func (block *BlockStmt) Format() []string {
+	var lines []string
+	lines = append(lines, "{")
+	for _, v := range block.Stmts {
+		lines = nodeFAppendTab(lines, v.Format())
+	}
+	lines = append(lines, "}")
+	return lines
+}
+
 func (block *BlockStmt) String() string {
-	return "block stmt"
+	return strings.Join(block.Format(), "\n")
+}
+
+type VarbDeclStmt struct {
+	LetPos token.LnColPos
+
+	VarbDeclAndAssi [][3]*Node
+}
+
+func (e *VarbDeclStmt) Format() []string {
+	lines := []string{""}
+
+	for i, v := range e.VarbDeclAndAssi {
+		curLine := len(lines) - 1
+
+		if i == 0 {
+			lines[curLine] = "let"
+		} else {
+			lines[curLine] += ", "
+		}
+
+		if v[0] != nil {
+			lines[curLine] += v[0].String()
+		}
+		if v[1] != nil {
+			lines[curLine] += ": " + v[1].String()
+		}
+		if v[2] != nil {
+			lines[curLine] += " = "
+			lines = nodeFAppendConnect(lines, v[2].Format())
+		}
+	}
+
+	return lines
+}
+
+func (e *VarbDeclStmt) String() string {
+	return strings.Join(e.Format(), "\n")
+}
+
+type StructDeclStmt struct {
+	Name string
+
+	Fields []*StructField
+
+	LBrace token.LnColPos
+	RBrace token.LnColPos
+}
+
+func (decl *StructDeclStmt) Format() []string {
+	v := []string{}
+	if decl.Name != "" {
+		v = append(v, fmt.Sprintf("struct %s {", decl.Name))
+	} else {
+		v = append(v, "struct {")
+	}
+	for i, f := range decl.Fields {
+		line := TabStr + f.Name
+		if decl.Fields[i].Type != nil {
+			line += ": " + decl.Fields[i].Type.String()
+		}
+		if i < len(decl.Fields)-1 {
+			line += ","
+		}
+		v = append(v, line)
+	}
+	v = append(v, "}")
+	return v
+}
+
+func (decl *StructDeclStmt) String() string {
+	return strings.Join(decl.Format(), "\n")
+}
+
+type StructField struct {
+	Name string
+	Type *Node
+}
+
+type FuncDeclStmt struct {
+	Name  string
+	Block *BlockStmt
+
+	Param []*FnParam
+
+	ReturnType []*Node
+
+	FnPos   token.LnColPos
+	NamePos token.LnColPos
+	LParen  token.LnColPos
+	RParen  token.LnColPos
+}
+
+type FnParam struct {
+	Name       string
+	Type       *Node
+	DefaultVal *Node
+}
+
+func (p *FnParam) String() string {
+	v := p.Name
+	if p.Type != nil {
+		v += ": " + p.Type.String()
+	}
+	if p.DefaultVal != nil {
+		v += " = " + p.DefaultVal.String()
+	}
+	return v
+}
+
+func (decl *FuncDeclStmt) Format() []string {
+	var lines []string
+
+	var p string
+
+	for i, v := range decl.Param {
+		if i != 0 {
+			p += ", "
+		}
+		p += v.String()
+	}
+
+	if len(decl.ReturnType) > 0 {
+		var r string
+		for i, v := range decl.ReturnType {
+			if i != 0 {
+				r += ", "
+			}
+			r += v.String()
+		}
+		lines = append(lines, fmt.Sprintf("fn %s(%s) -> %s ",
+			decl.Name, p, r))
+	} else {
+		lines = append(lines, fmt.Sprintf("fn %s(%s) ",
+			decl.Name, p))
+	}
+
+	lines = nodeFAppendConnect(lines, decl.Block.Format())
+
+	return lines
+}
+
+func (decl *FuncDeclStmt) String() string {
+	return strings.Join(decl.Format(), "\n")
 }

@@ -44,8 +44,8 @@ type Identifier struct {
 	Start token.LnColPos
 }
 
-func (e *Identifier) IsExpr() bool {
-	return true
+func (e *Identifier) Format() []string {
+	return []string{e.Name}
 }
 
 func (e *Identifier) String() string {
@@ -57,33 +57,25 @@ type StringLiteral struct {
 	Start token.LnColPos
 }
 
-func (e *StringLiteral) IsExpr() bool {
-	return true
+func (e *StringLiteral) Format() []string {
+	return []string{fmt.Sprintf("'%s'", e.Val)}
 }
 
 func (e *StringLiteral) String() string {
 	return fmt.Sprintf("'%s'", e.Val)
 }
 
-// type NumberLiteral struct {
-// 	IsInt bool
-// 	Float float64
-// 	Int   int64
-// 	Start token.FilePos
-// 	End   token.FilePos
-// }
-
 type IntegerLiteral struct {
 	Val   int64
 	Start token.LnColPos
 }
 
-func (e *IntegerLiteral) String() string {
-	return fmt.Sprintf("%d", e.Val)
+func (e *IntegerLiteral) Format() []string {
+	return []string{fmt.Sprintf("%d", e.Val)}
 }
 
-func (e *IntegerLiteral) IsExpr() bool {
-	return true
+func (e *IntegerLiteral) String() string {
+	return fmt.Sprintf("%d", e.Val)
 }
 
 type FloatLiteral struct {
@@ -91,17 +83,21 @@ type FloatLiteral struct {
 	Start token.LnColPos
 }
 
-func (e *FloatLiteral) String() string {
-	return fmt.Sprintf("%f", e.Val)
+func (e *FloatLiteral) Format() []string {
+	return []string{fmt.Sprintf("%f", e.Val)}
 }
 
-func (e *FloatLiteral) IsExpr() bool {
-	return true
+func (e *FloatLiteral) String() string {
+	return fmt.Sprintf("%f", e.Val)
 }
 
 type BoolLiteral struct {
 	Val   bool
 	Start token.LnColPos
+}
+
+func (e *BoolLiteral) Format() []string {
+	return []string{fmt.Sprintf("%v", e.Val)}
 }
 
 func (e *BoolLiteral) String() string {
@@ -112,8 +108,8 @@ type NilLiteral struct {
 	Start token.LnColPos
 }
 
-func (e *NilLiteral) IsExpr() bool {
-	return true
+func (e *NilLiteral) Format() []string {
+	return []string{"nil"}
 }
 
 func (e *NilLiteral) String() string {
@@ -121,43 +117,58 @@ func (e *NilLiteral) String() string {
 }
 
 type MapInitExpr struct {
+	Type *Node
+
 	KeyValeList [][2]*Node // key,value list
 	LBrace      token.LnColPos
 	RBrace      token.LnColPos
 }
 
-func (e *MapInitExpr) IsExpr() bool {
-	return true
+func (e *MapInitExpr) Format() []string {
+	lines := []string{}
+
+	if e.Type != nil {
+		lines = e.Type.Format()
+	}
+
+	lines = nodeFAppendConnect(lines, []string{"{"})
+
+	for _, item := range e.KeyValeList {
+		lines = append(lines, TabStr+item[0].String()+": "+item[1].String()+",")
+	}
+	lines = append(lines, "}")
+
+	return lines
 }
 
 func (e *MapInitExpr) String() string {
-	v := "{"
-	for i, item := range e.KeyValeList {
-		if i == 0 {
-			v += item[0].String() + ": " + item[1].String()
-		} else {
-			v += ", " + item[0].String() + ": " + item[1].String()
-		}
-	}
-	return v + "}"
+	return strings.Join(e.Format(), "\n")
 }
 
 type ListInitExpr struct {
+	Type *Node
+
 	List     []*Node
 	LBracket token.LnColPos
 	RBracket token.LnColPos
 }
 
-func (e *ListInitExpr) IsExpr() bool {
-	return true
+func (e *ListInitExpr) Format() []string {
+	lines := []string{"["}
+	for i, elem := range e.List {
+		if i == 0 {
+			lines = nodeFAppendConnect(lines, elem.Format())
+		} else {
+			lines = nodeFAppendConnect(lines, []string{", "})
+			lines = nodeFAppendConnect(lines, elem.Format())
+		}
+	}
+	lines = nodeFAppendConnect(lines, []string{"]"})
+	return lines
 }
 
 func (e *ListInitExpr) String() string {
-	arr := []string{}
-	for _, x := range e.List {
-		arr = append(arr, x.String())
-	}
-	return "[" + strings.Join(arr, ", ") + "]"
+	return strings.Join(e.Format(), "\n")
 }
 
 type ConditionalExpr struct {
@@ -166,12 +177,15 @@ type ConditionalExpr struct {
 	OpPos    token.LnColPos
 }
 
-func (e *ConditionalExpr) IsExpr() bool {
-	return true
+func (e *ConditionalExpr) Format() []string {
+	lines := e.LHS.Format()
+	lines = nodeFAppendConnect(lines, []string{" " + string(e.Op) + " "})
+	lines = nodeFAppendConnect(lines, e.RHS.Format())
+	return lines
 }
 
 func (e *ConditionalExpr) String() string {
-	return fmt.Sprintf("%s %s %s", e.LHS.String(), e.Op, e.RHS.String())
+	return strings.Join(e.Format(), "\n")
 }
 
 type ArithmeticExpr struct {
@@ -180,12 +194,15 @@ type ArithmeticExpr struct {
 	OpPos    token.LnColPos
 }
 
-func (e *ArithmeticExpr) IsExpr() bool {
-	return true
+func (e *ArithmeticExpr) Format() []string {
+	lines := e.LHS.Format()
+	lines = nodeFAppendConnect(lines, []string{" " + string(e.Op) + " "})
+	lines = nodeFAppendConnect(lines, e.RHS.Format())
+	return lines
 }
 
 func (e *ArithmeticExpr) String() string {
-	return fmt.Sprintf("%s %s %s", e.LHS.String(), e.Op, e.RHS.String())
+	return strings.Join(e.Format(), "\n")
 }
 
 type AttrExpr struct {
@@ -194,19 +211,23 @@ type AttrExpr struct {
 	Start token.LnColPos
 }
 
-func (e *AttrExpr) IsExpr() bool {
-	return true
+func (e *AttrExpr) Format() []string {
+	lines := []string{}
+
+	if e.Attr != nil {
+		lines = e.Attr.Format()
+		lines = nodeFAppendConnect(lines, []string{"."})
+	}
+
+	if e.Obj != nil {
+		lines = nodeFAppendConnect(lines, e.Obj.Format())
+	}
+
+	return lines
 }
 
 func (e *AttrExpr) String() string {
-	if e.Attr != nil {
-		if e.Obj == nil {
-			return e.Attr.String()
-		}
-		return e.Obj.String() + "." + e.Attr.String()
-	} else {
-		return e.Obj.String()
-	}
+	return strings.Join(e.Format(), "\n")
 }
 
 type IndexExpr struct {
@@ -216,20 +237,25 @@ type IndexExpr struct {
 	RBracket []token.LnColPos
 }
 
-func (e *IndexExpr) IsExpr() bool {
-	return true
+func (e *IndexExpr) Format() []string {
+	lines := []string{}
+
+	if e.Obj != nil {
+		lines = e.Obj.Format()
+		lines = nodeFAppendConnect(lines, []string{"."})
+	}
+
+	for _, elem := range e.Index {
+		lines = nodeFAppendConnect(lines, []string{"["})
+		lines = nodeFAppendConnect(lines, elem.Format())
+		lines = nodeFAppendConnect(lines, []string{"]"})
+	}
+
+	return lines
 }
 
 func (e *IndexExpr) String() string {
-	x := ""
-	if e.Obj != nil {
-		x = e.Obj.String()
-	}
-	for _, i := range e.Index {
-		x += fmt.Sprintf("[%s]", i)
-	}
-
-	return x
+	return strings.Join(e.Format(), "\n")
 }
 
 type ParenExpr struct {
@@ -238,12 +264,15 @@ type ParenExpr struct {
 	RParen token.LnColPos
 }
 
-func (e *ParenExpr) IsExpr() bool {
-	return true
+func (e ParenExpr) Format() []string {
+	lines := []string{"("}
+	lines = nodeFAppendConnect(lines, e.Param.Format())
+	lines = nodeFAppendConnect(lines, []string{")"})
+	return lines
 }
 
 func (e *ParenExpr) String() string {
-	return fmt.Sprintf("(%s)", e.Param.String())
+	return strings.Join(e.Format(), "\n")
 }
 
 type CallExpr struct {
@@ -268,16 +297,20 @@ type CallExpr struct {
 	Re   *regexp.Regexp
 }
 
-func (e *CallExpr) IsExpr() bool {
-	return true
+func (e *CallExpr) Format() []string {
+	lines := []string{e.Name + "("}
+	for i, p := range e.Param {
+		if i != 0 {
+			lines = nodeFAppendConnect(lines, []string{", "})
+		}
+		lines = nodeFAppendConnect(lines, p.Format())
+	}
+	lines = nodeFAppendConnect(lines, []string{")"})
+	return lines
 }
 
 func (e *CallExpr) String() string {
-	arr := []string{}
-	for _, n := range e.Param {
-		arr = append(arr, n.String())
-	}
-	return fmt.Sprintf("%s(%s)", strings.ToLower(e.Name), strings.Join(arr, ", "))
+	return strings.Join(e.Format(), "\n")
 }
 
 type AssignmentExpr struct {
@@ -285,10 +318,18 @@ type AssignmentExpr struct {
 	OpPos    token.LnColPos
 }
 
-func (e *AssignmentExpr) IsExpr() bool {
-	return true
+func (e *AssignmentExpr) Format() []string {
+	lines := []string{}
+	if e.LHS != nil {
+		lines = e.LHS.Format()
+	}
+	lines = nodeFAppendConnect(lines, []string{" = "})
+	if e.RHS != nil {
+		lines = nodeFAppendConnect(lines, e.RHS.Format())
+	}
+	return lines
 }
 
 func (e *AssignmentExpr) String() string {
-	return fmt.Sprintf("%s = %s", e.LHS, e.RHS)
+	return strings.Join(e.Format(), "\n")
 }

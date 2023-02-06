@@ -191,7 +191,7 @@ func TestExprSeparation(t *testing.T) {
 								}},
 							},
 						},
-						Else: nil,
+						Else: &ast.BlockStmt{},
 					},
 				),
 			},
@@ -262,6 +262,64 @@ func TestExprSeparation(t *testing.T) {
 		})
 	}
 }
+
+// func TestParseType(t *testing.T) {
+// 	cases := []struct {
+// 		name     string
+// 		in       string
+// 		expected ast.Stmts
+// 		err      string
+// 		fail     bool
+// 	}{
+// 		{
+// 			in: `
+// []int [[]int [1,2,3], map[string][]int {1:2}, {"a": "v"}, [1,2]]
+
+// let a :int = 1; let b: a = 1; let a = []a [1]; ; let a=  (b=2)`,
+// 		},
+// 		{
+// 			in: "struct a {x, v: int, b: a, z:any, d: map[string][]map[string]int}",
+// 		},
+// 		{
+// 			in: "map[int][]int",
+// 		},
+// 		{
+// 			in: "[]any [1,3]",
+// 		},
+// 		{
+// 			in: "fn a(b: int) -> map[string]int { a =1}",
+// 		},
+// 		{
+// 			in: "if 1 {}",
+// 		},
+// 	}
+
+// 	for _, tc := range cases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			Stmts, err := ParsePipeline("", tc.in)
+
+// 			if !tc.fail {
+// 				assert.Nil(t, err)
+// 			} else {
+// 				t.Logf("expected error: %s", err)
+// 				assert.NotNil(t, err, "")
+// 				return
+// 			}
+
+// 			if !tc.fail {
+// 				var x, y string
+// 				x = tc.expected.String()
+// 				y = Stmts.String()
+// 				assert.Nil(t, err)
+// 				assert.Equal(t, x, y)
+// 				t.Logf("input:\n%s\nfotmat:\n%s", tc.in, y)
+// 			} else {
+// 				t.Logf("%s -> expect fail: %v", tc.in, err)
+// 				assert.NotNil(t, err, "")
+// 			}
+// 		})
+// 	}
+// }
 
 func TestParserFor(t *testing.T) {
 	cases := []struct {
@@ -385,7 +443,7 @@ func TestParserFor(t *testing.T) {
 				Body: &ast.BlockStmt{Stmts: ast.Stmts{
 					ast.WrapAssignmentExpr(&ast.AssignmentExpr{
 						LHS: ast.WrapIdentifier(&ast.Identifier{Name: "b"}),
-						RHS: ast.WrapIntegerLiteral(&ast.IntegerLiteral{Val: 1}),
+						RHS: ast.WrapIntegerLiteral(&ast.IntegerLiteral{Val: 2}),
 					}),
 				}},
 			})},
@@ -726,6 +784,7 @@ func TestParser(t *testing.T) {
 							}),
 						},
 					},
+					Else: &ast.BlockStmt{},
 				}),
 			},
 		},
@@ -974,12 +1033,12 @@ func TestParser(t *testing.T) {
 
 		{
 			name: "func_call_in_assignement_right",
-			in:   `a = fn("a", true, a1=["b", 1.1])`,
+			in:   `a = fnx("a", true, a1=["b", 1.1])`,
 			expected: ast.Stmts{
 				ast.WrapAssignmentExpr(&ast.AssignmentExpr{
 					LHS: ast.WrapIdentifier(&ast.Identifier{Name: "a"}),
 					RHS: ast.WrapCallExpr(&ast.CallExpr{
-						Name: "fn",
+						Name: "fnx",
 						Param: []*ast.Node{
 							ast.WrapStringLiteral(&ast.StringLiteral{Val: "a"}),
 							ast.WrapBoolLiteral(&ast.BoolLiteral{Val: true}),
@@ -1316,7 +1375,7 @@ multiline-string
 				y = Stmts.String()
 				assert.Nil(t, err)
 				assert.Equal(t, x, y)
-				t.Logf("ok %s -> %s", tc.in, y)
+				t.Logf("ok %s ==> %s", tc.in, y)
 			} else {
 				t.Logf("%s -> expect fail: %v", tc.in, err)
 				assert.NotNil(t, err, "")

@@ -7,19 +7,20 @@
 package parser
 
 import (
-	ast "github.com/GuanceCloud/platypus/pkg/ast"
+	plast "github.com/GuanceCloud/platypus/pkg/ast"
+	// pltoken "github.com/GuanceCloud/platypus/pkg/token"
 )
 
 %}
 
 %union {
-	aststmts   ast.Stmts
-	astblock   *ast.BlockStmt
+	aststmts   plast.Stmts
+	astblock   *plast.BlockStmt
 
-	ifitem     *ast.IfStmtElem
-	iflist	   []*ast.IfStmtElem
-	node       *ast.Node
-	nodes      []*ast.Node
+	ifitem     *plast.IfStmtElem
+	iflist	   []*plast.IfStmtElem
+	node       *plast.Node
+	nodes      []*plast.Node
 	item       Item
 
 }
@@ -28,7 +29,7 @@ import (
 	LEFT_PAREN LEFT_BRACKET LEFT_BRACE RIGHT_BRACE
 	RIGHT_PAREN RIGHT_BRACKET SPACE STRING QUOTED_STRING MULTILINE_STRING
 	FOR IN WHILE BREAK CONTINUE	RETURN EOL COLON
-	STR INT FLOAT BOOL LIST MAP
+	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB
 
 // operator
 %token operatorsStart
@@ -74,17 +75,22 @@ NIL NULL IF ELIF ELSE
 	if_elif_list
 
 %type<nodes>
-	function_args
+	func_call_args
 
 %type <node>
 	stmt
 	assignment_expr
+	varb_decl_stmt
 	for_in_stmt
 	for_stmt
 	continue_stmt
 	break_stmt
 	ifelse_stmt
 	call_expr
+	map_type
+	list_type
+	base_type
+	all_type
 
 %type <node>
 	identifier
@@ -105,6 +111,10 @@ NIL NULL IF ELIF ELSE
 	nil_literal
 	number_literal
 	value_stmt
+	struct_type_decl_start
+	struct_type_decl_stmt
+	fn_decl_start
+	fn_decl_stmt
 	//columnref
 
 %start start
@@ -141,13 +151,13 @@ stmts: stmts_list stmt
 		}
 	| stmts_list
 	| stmt
-		{ $$ = ast.Stmts{$1} }	
+		{ $$ = plast.Stmts{$1} }	
 	;
 
 stmts_list	: stmt sep
-		{ $$ = ast.Stmts{$1} }
+		{ $$ = plast.Stmts{$1} }
 	| sep
-		{ $$ = ast.Stmts{} }
+		{ $$ = plast.Stmts{} }
 	| stmts_list stmt sep
 		{
 		s := $1
@@ -162,6 +172,10 @@ stmt	: ifelse_stmt
 	| continue_stmt
 	| break_stmt
 	| value_stmt
+	| struct_type_decl_stmt
+	| map_type
+	| varb_decl_stmt
+	| fn_decl_stmt
 	;
 
 
@@ -169,7 +183,7 @@ value_stmt: expr
 	;
 
 /* expression */
-expr	: array_elem | list_init | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+expr	: array_elem | assignment_expr | list_init | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
 
 
 break_stmt: BREAK
@@ -230,7 +244,7 @@ if_elem: IF expr stmt_block
 	;
 
 if_elif_list: if_elem
-		{ $$ = []*ast.IfStmtElem{ $1 } }
+		{ $$ = []*plast.IfStmtElem{ $1 } }
 	| if_elif_list elif_elem
 		{ $$ = append($1, $2) }
 	;
@@ -246,11 +260,11 @@ stmt_block	: empty_block
 	;
 
 empty_block : LEFT_BRACE RIGHT_BRACE
-		{ $$ = yylex.(*parser).newBlockStmt($1, ast.Stmts{} , $2) }
+		{ $$ = yylex.(*parser).newBlockStmt($1, plast.Stmts{} , $2) }
 	;
 
 
-call_expr : identifier LEFT_PAREN function_args RIGHT_PAREN
+call_expr : identifier LEFT_PAREN func_call_args RIGHT_PAREN
 		{
 			$$ = yylex.(*parser).newCallExpr($1, $3, $2, $4)
 		}
@@ -258,7 +272,7 @@ call_expr : identifier LEFT_PAREN function_args RIGHT_PAREN
 		{
 			$$ = yylex.(*parser).newCallExpr($1, nil, $2, $3)
 		}
-	| identifier LEFT_PAREN function_args EOLS RIGHT_PAREN
+	| identifier LEFT_PAREN func_call_args EOLS RIGHT_PAREN
 		{
 			$$ = yylex.(*parser).newCallExpr($1, $3, $2, $5)
 		}
@@ -269,21 +283,37 @@ call_expr : identifier LEFT_PAREN function_args RIGHT_PAREN
 	;
 
 
-function_args	: function_args COMMA expr
+func_call_args	: func_call_args COMMA expr
 			{
 			$$ = append($$, $3)
 			}
-		| function_args COMMA
+		| func_call_args COMMA
 		| expr
-			{ $$ = []*ast.Node{$1} }
+			{ $$ = []*plast.Node{$1} }
 		;
 
 
-binary_expr: conditional_expr | assignment_expr | arithmeticExpr ;
+binary_expr: conditional_expr | arithmeticExpr ;
 
-assignment_expr	: expr EQ expr
-           		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
-		;
+varb_decl_stmt: LET identifier EQ expr
+		{ 
+			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+		}	
+	| LET identifier COLON all_type EQ expr
+		{ 
+			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+		}	
+	| varb_decl_stmt COMMA identifier COLON all_type EQ expr
+	| varb_decl_stmt COMMA identifier EQ expr
+	;
+
+assignment_expr: index_expr EQ expr
+        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
+	| attr_expr EQ expr
+        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
+	| identifier EQ expr
+		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
+	;
 
 conditional_expr	: expr GTE expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
@@ -367,7 +397,7 @@ attr_expr	: identifier DOT index_expr
 		;
 
 
-list_init : list_init_start RIGHT_BRACKET
+list_init :list_init_start RIGHT_BRACKET
 			{
 				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
 			}
@@ -377,18 +407,22 @@ list_init : list_init_start RIGHT_BRACKET
 			}
 		| LEFT_BRACKET RIGHT_BRACKET
 			{ 
-				$$ = yylex.(*parser).newListInitStartExpr($1.Pos)
+				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
 				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-
 			}
 		;
 
-list_init_start : LEFT_BRACKET array_elem
+list_init_start :  LEFT_BRACKET expr
 			{ 
-				$$ = yylex.(*parser).newListInitStartExpr($1.Pos)
+				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
 				$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
 			}
-		| list_init_start COMMA array_elem
+		| list_type LEFT_BRACKET expr
+			{ 
+				$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
+				$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
+			}
+		| list_init_start COMMA expr
 				{				
 					$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
 				}
@@ -400,22 +434,27 @@ map_init : map_init_start RIGHT_BRACE
 			{
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.Pos)
 			}
-		|  map_init_start COMMA RIGHT_BRACE
+		| map_init_start COMMA RIGHT_BRACE
 			{
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $3.Pos)
 			}
 		| empty_block
 			{ 
-				$$ = yylex.(*parser).newMapInitStartExpr($1.LBracePos.Pos)
+				$$ = yylex.(*parser).newMapInitStartExpr($1.LBracePos.Pos, nil)
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $1.RBracePos.Pos)
 			}
 		;
 
 map_init_start: LEFT_BRACE expr COLON expr
 		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos)
+			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
 			$$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
 		}
+	| map_type LEFT_BRACE expr COLON expr
+		{ 
+			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
+			$$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
+		} 
 	| map_init_start COMMA expr COLON expr
 		{
 			$$ = yylex.(*parser).newMapInitAppendExpr($1, $3, $5)
@@ -424,15 +463,12 @@ map_init_start: LEFT_BRACE expr COLON expr
 	;
 
 
-
 array_elem	: bool_literal
 		| string_literal
 		| nil_literal
 		| number_literal
 		| identifier
 		;
-
-
 
 /*
 	literal:
@@ -476,7 +512,7 @@ number_literal	: NUMBER
 			switch $1.Typ {
 			case ADD: // pass
 			case SUB:
-				if num.NodeType == ast.TypeFloatLiteral {
+				if num.NodeType == plast.TypeFloatLiteral {
 					num.FloatLiteral.Val = -num.FloatLiteral.Val
 					num.FloatLiteral.Start = yylex.(*parser).posCache.LnCol($1.Pos)
 				} else {
@@ -491,12 +527,12 @@ number_literal	: NUMBER
 
 identifier: ID
 			{
-				$$ = yylex.(*parser).newIdentifierLiteral($1)
+				$$ = yylex.(*parser).newIdentifier($1)
 			}
 		| QUOTED_STRING
 			{
 				$1.Val = yylex.(*parser).unquoteString($1.Val) 
-				$$ = yylex.(*parser).newIdentifierLiteral($1)
+				$$ = yylex.(*parser).newIdentifier($1)
 			}
 		;
 
@@ -504,5 +540,120 @@ identifier: ID
 unary_op	: ADD | SUB ;
 
 
-%%
+all_type: base_type | list_type | map_type ;
 
+base_type: BOOL
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| INT
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| FLOAT
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| STR
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| ANY
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| identifier
+		{
+			$$ = yylex.(*parser).newNamedType($1.Identifier.Name, 0)
+		}
+	;
+
+
+list_type: LEFT_BRACKET RIGHT_BRACKET all_type
+		{	
+			$$ = yylex.(*parser).newListType($3)
+		}
+	;
+
+map_type : MAP LEFT_BRACKET base_type RIGHT_BRACKET all_type
+		{	
+			$$ = yylex.(*parser).newMapType($3, $5)
+		}
+	;
+
+
+struct_type_decl_start : STRUCT identifier LEFT_BRACE identifier
+		{
+			$$ = yylex.(*parser).newStructTypeDecl($2)
+			$$ = yylex.(*parser).structTypeAppendField($$, $4, nil)
+		}
+	| STRUCT identifier LEFT_BRACE identifier COLON all_type
+		{
+			$$ = yylex.(*parser).newStructTypeDecl($2)
+			$$ = yylex.(*parser).structTypeAppendField($$, $4, $6)
+		}
+	| struct_type_decl_start COMMA identifier
+		{
+			$$ = yylex.(*parser).structTypeAppendField($$, $3, nil)
+		}
+	| struct_type_decl_start COMMA identifier COLON all_type
+		{
+			$$ = yylex.(*parser).structTypeAppendField($$, $3, $5)
+		}
+	;
+
+
+struct_type_decl_stmt: struct_type_decl_start RIGHT_BRACE
+		{
+			$$ = $1
+		}
+	| struct_type_decl_start COMMA RIGHT_BRACE
+		{
+			$$ = $1
+		}
+	| STRUCT identifier empty_block
+		{
+			$$ = yylex.(*parser).newStructTypeDecl($2)
+		}
+	;
+
+fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block
+		{
+			$$ = yylex.(*parser).fnDeclAppenReturn($1, $4)
+			$$ = yylex.(*parser).fnDeclEnd($$, $5)
+		}
+	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block
+		{
+			$$ = yylex.(*parser).fnDeclAppenReturn($1, $5)
+			$$ = yylex.(*parser).fnDeclEnd($$, $6)
+		}
+	| fn_decl_start RIGHT_PAREN stmt_block
+		{
+			$$ = yylex.(*parser).fnDeclEnd($$, $3)
+		}
+	| fn_decl_start COMMA RIGHT_PAREN stmt_block
+		{
+			$$ = yylex.(*parser).fnDeclEnd($$, $4)
+		}
+	;
+
+fn_decl_start: FN identifier LEFT_PAREN identifier
+		{
+			$$ = yylex.(*parser).newFnDecl($2)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil)
+		}
+	| FN identifier LEFT_PAREN identifier COLON all_type
+		{
+			$$ = yylex.(*parser).newFnDecl($2)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6)
+		}
+	| fn_decl_start COMMA identifier
+		{
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil)
+		}
+	| fn_decl_start COMMA identifier COLON all_type
+		{
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5)
+		}
+	;
+%%

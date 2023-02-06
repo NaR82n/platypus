@@ -17,9 +17,9 @@ import (
 type NodeType uint
 
 const (
-	// expr.
 	TypeInvalid NodeType = iota
 
+	// Expr.
 	TypeIdentifier
 	TypeStringLiteral
 	TypeIntegerLiteral
@@ -41,13 +41,21 @@ const (
 
 	TypeCallExpr
 
-	// stmt.
+	// Stmt.
 	TypeBlockStmt
 	TypeIfelseStmt
 	TypeForStmt
 	TypeForInStmt
 	TypeContinueStmt
 	TypeBreakStmt
+
+	// Decl.
+	TypeStructTypeDecl
+	TypeVarbDecl
+	TypeFuncDeclStmt
+
+	// Type.
+	TypeType
 )
 
 func (t NodeType) String() string {
@@ -96,6 +104,14 @@ func (t NodeType) String() string {
 		return "ContinueStmt"
 	case TypeBreakStmt:
 		return "BreakStmt"
+	case TypeFuncDeclStmt:
+		return "FuncDeclStmt"
+	case TypeStructTypeDecl:
+		return "StructTypeDeclStmt"
+	case TypeVarbDecl:
+		return "VarbDeclStmt"
+	case TypeType:
+		return "Type"
 	}
 	return "Undefined"
 }
@@ -163,8 +179,68 @@ type Node struct {
 	ForInStmt    *ForInStmt
 	ContinueStmt *ContinueStmt
 	BreakStmt    *BreakStmt
+
+	// decl
+	StructTypeDeclStmt *StructDeclStmt
+	VarbDeclStmt       *VarbDeclStmt
+	FnDeclStmt         *FuncDeclStmt
+	// type
+	Type *Type
 }
 
+func (node *Node) Format() []string {
+	switch node.NodeType { //nolint:exhaustive
+	case TypeIdentifier:
+		return node.Identifier.Format()
+	case TypeStringLiteral:
+		return node.StringLiteral.Format()
+	case TypeIntegerLiteral:
+		return node.IntegerLiteral.Format()
+	case TypeFloatLiteral:
+		return node.FloatLiteral.Format()
+	case TypeBoolLiteral:
+		return node.BoolLiteral.Format()
+	case TypeNilLiteral:
+		return node.NilLiteral.Format()
+	case TypeListInitExpr:
+		return node.ListInitExpr.Format()
+	case TypeMapInitExpr:
+		return node.MapInitExpr.Format()
+	case TypeParenExpr:
+		return node.ParenExpr.Format()
+	case TypeAttrExpr:
+		return node.AttrExpr.Format()
+	case TypeIndexExpr:
+		return node.IndexExpr.Format()
+	case TypeArithmeticExpr:
+		return node.ArithmeticExpr.Format()
+	case TypeConditionalExpr:
+		return node.ConditionalExpr.Format()
+	case TypeAssignmentExpr:
+		return node.AssignmentExpr.Format()
+	case TypeCallExpr:
+		return node.CallExpr.Format()
+	case TypeIfelseStmt:
+		return node.IfelseStmt.Format()
+	case TypeForStmt:
+		return node.ForStmt.Format()
+	case TypeForInStmt:
+		return node.ForInStmt.Format()
+	case TypeContinueStmt:
+		return node.ContinueStmt.Format()
+	case TypeBreakStmt:
+		return node.BreakStmt.Format()
+	case TypeStructTypeDecl:
+		return node.StructTypeDeclStmt.Format()
+	case TypeFuncDeclStmt:
+		return node.FnDeclStmt.Format()
+	case TypeVarbDecl:
+		return node.VarbDeclStmt.Format()
+	case TypeType:
+		return node.Type.Format()
+	}
+	return []string{"node format failed"}
+}
 func (node *Node) String() string {
 	switch node.NodeType { //nolint:exhaustive
 	case TypeIdentifier:
@@ -207,6 +283,14 @@ func (node *Node) String() string {
 		return node.ContinueStmt.String()
 	case TypeBreakStmt:
 		return node.BreakStmt.String()
+	case TypeStructTypeDecl:
+		return node.StructTypeDeclStmt.String()
+	case TypeFuncDeclStmt:
+		return node.FnDeclStmt.String()
+	case TypeVarbDecl:
+		return node.VarbDeclStmt.String()
+	case TypeType:
+		return node.Type.String()
 	}
 	return "node conv to string failed"
 }
@@ -358,6 +442,34 @@ func WrapeBlockStmt(node *BlockStmt) *Node {
 	}
 }
 
+func WrapStructTypeDecl(node *StructDeclStmt) *Node {
+	return &Node{
+		NodeType:           TypeStructTypeDecl,
+		StructTypeDeclStmt: node,
+	}
+}
+
+func WrapVarbDecl(node *VarbDeclStmt) *Node {
+	return &Node{
+		NodeType:     TypeVarbDecl,
+		VarbDeclStmt: &VarbDeclStmt{},
+	}
+}
+
+func WrapFnDecl(node *FuncDeclStmt) *Node {
+	return &Node{
+		NodeType:   TypeFuncDeclStmt,
+		FnDeclStmt: node,
+	}
+}
+
+func WrapType(node *Type) *Node {
+	return &Node{
+		NodeType: TypeType,
+		Type:     node,
+	}
+}
+
 func (node *Node) StartPos() token.LnColPos {
 	return NodeStartPos(node)
 }
@@ -402,7 +514,6 @@ func NodeStartPos(node *Node) token.LnColPos {
 		return node.ConditionalExpr.LHS.StartPos()
 	case TypeAssignmentExpr:
 		return node.AssignmentExpr.LHS.StartPos()
-
 	case TypeCallExpr:
 		return node.CallExpr.NamePos
 
@@ -426,4 +537,22 @@ func NodeStartPos(node *Node) token.LnColPos {
 		return node.BreakStmt.Start
 	}
 	return token.InvalidLnColPos
+}
+
+func nodeFAppendTab(src, dst []string) []string {
+	for i := range dst {
+		src = append(src, TabStr+dst[i])
+	}
+	return src
+}
+
+func nodeFAppendConnect(src, dst []string) []string {
+	for i := range dst {
+		if i == 0 && len(src) != 0 {
+			src[len(src)-1] = src[len(src)-1] + dst[i]
+		} else {
+			src = append(src, dst[i])
+		}
+	}
+	return src
 }
