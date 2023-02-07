@@ -91,6 +91,7 @@ NIL NULL IF ELIF ELSE
 	list_type
 	base_type
 	all_type
+	ptr_type
 
 %type <node>
 	identifier
@@ -115,6 +116,8 @@ NIL NULL IF ELIF ELSE
 	struct_type_decl_stmt
 	fn_decl_start
 	fn_decl_stmt
+	get_p_expr
+	p_get_expr
 	//columnref
 
 %start start
@@ -123,6 +126,7 @@ NIL NULL IF ELIF ELSE
 %right EQ
 %left OR
 %left AND
+%left BitwiseAND
 %left GTE GT NEQ EQEQ LTE LT
 %left ADD SUB
 %left MUL DIV MOD
@@ -173,7 +177,6 @@ stmt	: ifelse_stmt
 	| break_stmt
 	| value_stmt
 	| struct_type_decl_stmt
-	| map_type
 	| varb_decl_stmt
 	| fn_decl_stmt
 	;
@@ -183,8 +186,20 @@ value_stmt: expr
 	;
 
 /* expression */
-expr	: array_elem | assignment_expr | list_init | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+expr	: array_elem | get_p_expr | p_get_expr | assignment_expr | list_init | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
 
+
+get_p_expr: MUL expr 
+	{
+		$$ = $2
+	}
+	;
+
+p_get_expr:  BitwiseAND expr
+	{
+		$$ = $2
+	}
+	;
 
 break_stmt: BREAK
 			{ $$ = yylex.(*parser).newBreakStmt($1.Pos) }
@@ -305,6 +320,11 @@ varb_decl_stmt: LET identifier
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
 			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, $4) 
 		}	
+	| LET identifier COLON all_type
+		{ 
+			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, nil) 
+		}	
 	| LET identifier COLON all_type EQ expr
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
@@ -317,6 +337,10 @@ varb_decl_stmt: LET identifier
 	| varb_decl_stmt COMMA identifier EQ expr
 		{
 			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, $5) 
+		}
+	| varb_decl_stmt COMMA identifier COLON all_type
+		{
+			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, nil) 
 		}
 	| varb_decl_stmt COMMA identifier COLON all_type EQ expr
 		{
@@ -349,6 +373,10 @@ conditional_expr	: expr GTE expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
 			| expr EQEQ expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
+			| expr BitwiseAND expr
+				{
+					$$ = $1
+				}
 			;
 
 
@@ -435,11 +463,11 @@ list_init_start :  LEFT_BRACKET expr
 				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
 				$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
 			}
-		| list_type LEFT_BRACKET expr
+		/* | list_type LEFT_BRACKET expr
 			{ 
 				$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
 				$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-			}
+			} */
 		| list_init_start COMMA expr
 				{				
 					$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
@@ -460,6 +488,11 @@ map_init : map_init_start RIGHT_BRACE
 			{ 
 				$$ = yylex.(*parser).newMapInitStartExpr($1.LBracePos.Pos, nil)
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $1.RBracePos.Pos)
+			}
+		| map_type empty_block
+			{ 
+				$$ = yylex.(*parser).newMapInitStartExpr($2.LBracePos.Pos, $1)
+				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.RBracePos.Pos)
 			}
 		;
 
@@ -558,7 +591,13 @@ identifier: ID
 unary_op	: ADD | SUB ;
 
 
-all_type: base_type | list_type | map_type ;
+all_type: base_type | list_type | map_type | ptr_type;
+
+ptr_type: MUL all_type
+	{
+		$$ = $2
+	}
+	;
 
 base_type: BOOL
 		{
@@ -618,6 +657,7 @@ struct_type_decl_start : STRUCT identifier LEFT_BRACE identifier
 		{
 			$$ = yylex.(*parser).structTypeAppendField($$, $3, $5)
 		}
+	| struct_type_decl_start EOL
 	;
 
 

@@ -230,11 +230,11 @@ func (e *VarbDeclStmt) Format() []string {
 		}
 		if v[1] != nil {
 			lines = nodeFAppendConcStr(lines, ": ")
-			lines = nodeFAppendConnect(lines, v[1].Format())
+			lines = nodeFAppendTabConnect(lines, v[1].Format())
 		}
 		if v[2] != nil {
 			lines = nodeFAppendConcStr(lines, " = ")
-			lines = nodeFAppendConnect(lines, v[2].Format())
+			lines = nodeFAppendTabConnect(lines, v[2].Format())
 		}
 	}
 
