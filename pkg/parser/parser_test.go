@@ -116,7 +116,7 @@ func TestExprSeparation(t *testing.T) {
 				ast.WrapCallExpr(
 					&ast.CallExpr{
 						Name: "func2",
-						Param: ast.FuncArgList{
+						Param: []*ast.Node{
 							ast.WrapIntegerLiteral(&ast.IntegerLiteral{Val: 1}),
 							ast.WrapIntegerLiteral(&ast.IntegerLiteral{Val: 3}),
 							ast.WrapStringLiteral(&ast.StringLiteral{Val: "3"}),
@@ -263,63 +263,63 @@ func TestExprSeparation(t *testing.T) {
 	}
 }
 
-// func TestParseType(t *testing.T) {
-// 	cases := []struct {
-// 		name     string
-// 		in       string
-// 		expected ast.Stmts
-// 		err      string
-// 		fail     bool
-// 	}{
-// 		{
-// 			in: `
-// []int [[]int [1,2,3], map[string][]int {1:2}, {"a": "v"}, [1,2]]
+func TestParseType(t *testing.T) {
+	cases := []struct {
+		name     string
+		in       string
+		expected ast.Stmts
+		err      string
+		fail     bool
+	}{
+		{
+			in: `
+[]int [[]int [1,2,3], map[string][]int {1:2}, {"a": "v"}, [1,2]]; a=1
 
-// let a :int = 1; let b: a = 1; let a = []a [1]; ; let a=  (b=2)`,
-// 		},
-// 		{
-// 			in: "struct a {x, v: int, b: a, z:any, d: map[string][]map[string]int}",
-// 		},
-// 		{
-// 			in: "map[int][]int",
-// 		},
-// 		{
-// 			in: "[]any [1,3]",
-// 		},
-// 		{
-// 			in: "fn a(b: int) -> map[string]int { a =1}",
-// 		},
-// 		{
-// 			in: "if 1 {}",
-// 		},
-// 	}
+let a :int = 1; let b: a = 1; let a = []a [1]; ; let a=  (b=2), c = []int [1,3,], d, f= {"a": []any[1,2,3, map[x]y {x:1}, {y:1}]}`,
+		},
+		{
+			in: "struct a {x, v: int, b: a, z:any, d: map[string][]map[string]int}",
+		},
+		{
+			in: "map[int][]int",
+		},
+		{
+			in: "[]any [1,3]",
+		},
+		{
+			in: "fn a(b: int = {a: 1}) -> map[string]int { a =1; map[string]int {a: 1, b:2}}",
+		},
+		{
+			in: "if 1 {}",
+		},
+	}
 
-// 	for _, tc := range cases {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			Stmts, err := ParsePipeline("", tc.in)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			Stmts, err := ParsePipeline("", tc.in)
 
-// 			if !tc.fail {
-// 				assert.Nil(t, err)
-// 			} else {
-// 				t.Logf("expected error: %s", err)
-// 				assert.NotNil(t, err, "")
-// 				return
-// 			}
+			if !tc.fail {
+				assert.Nil(t, err)
+			} else {
+				t.Logf("expected error: %s", err)
+				assert.NotNil(t, err, "")
+				return
+			}
 
-// 			if !tc.fail {
-// 				var x, y string
-// 				x = tc.expected.String()
-// 				y = Stmts.String()
-// 				assert.Nil(t, err)
-// 				assert.Equal(t, x, y)
-// 				t.Logf("input:\n%s\nfotmat:\n%s", tc.in, y)
-// 			} else {
-// 				t.Logf("%s -> expect fail: %v", tc.in, err)
-// 				assert.NotNil(t, err, "")
-// 			}
-// 		})
-// 	}
-// }
+			if !tc.fail {
+				var x, y string
+				x = tc.expected.String()
+				y = Stmts.String()
+				assert.Nil(t, err)
+				assert.Equal(t, x, y)
+				t.Logf("input:\n%s\nfotmat:\n%s", tc.in, y)
+			} else {
+				t.Logf("%s -> expect fail: %v", tc.in, err)
+				assert.NotNil(t, err, "")
+			}
+		})
+	}
+}
 
 func TestParserFor(t *testing.T) {
 	cases := []struct {

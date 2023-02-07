@@ -7,8 +7,6 @@
 package ast
 
 import (
-	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/GuanceCloud/platypus/pkg/token"
@@ -118,28 +116,10 @@ func (t NodeType) String() string {
 
 type Stmts []*Node
 
-type KwArgs map[string]*Node
-
-type FuncArgList []*Node
-
-func (e KwArgs) String() string {
-	keys := []string{}
-	for k := range e {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	arr := []string{}
-	for _, key := range keys {
-		arr = append(arr, fmt.Sprintf("%s = %s", key, e[key]))
-	}
-	return strings.Join(arr, ", ")
-}
-
 func (e Stmts) String() string {
 	arr := []string{}
 	for _, x := range e {
-		arr = append(arr, x.String())
+		arr = append(arr, x.Format()...)
 	}
 	return strings.Join(arr, "\n")
 }
@@ -546,6 +526,17 @@ func nodeFAppendTab(src, dst []string) []string {
 	return src
 }
 
+func nodeFAppendTabConnect(src, dst []string) []string {
+	for i := range dst {
+		if i == 0 && len(src) != 0 {
+			src[len(src)-1] = src[len(src)-1] + dst[i]
+		} else {
+			src = append(src, TabStr+dst[i])
+		}
+	}
+	return src
+}
+
 func nodeFAppendConnect(src, dst []string) []string {
 	for i := range dst {
 		if i == 0 && len(src) != 0 {
@@ -553,6 +544,15 @@ func nodeFAppendConnect(src, dst []string) []string {
 		} else {
 			src = append(src, dst[i])
 		}
+	}
+	return src
+}
+
+func nodeFAppendConcStr(src []string, dst string) []string {
+	if len(src) != 0 {
+		src[len(src)-1] = src[len(src)-1] + dst
+	} else {
+		src = append(src, dst)
 	}
 	return src
 }

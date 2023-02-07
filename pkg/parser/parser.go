@@ -175,6 +175,17 @@ func (p *parser) newVarbDeclStmt(val Item) *ast.Node {
 	})
 }
 
+func (p *parser) varbDeclAppend(s, k, v, t *ast.Node) *ast.Node {
+	if s.NodeType != ast.TypeVarbDecl {
+		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
+			"%s object is not VarbDeclStmt", s.NodeType)
+	}
+	s.VarbDeclStmt.VarbDeclAndAssi = append(s.VarbDeclStmt.VarbDeclAndAssi, [3]*ast.Node{
+		k, v, t,
+	})
+	return s
+}
+
 func (p *parser) newStringLiteral(val Item) *ast.Node {
 	return ast.WrapStringLiteral(&ast.StringLiteral{
 		Val:   val.Val,
@@ -511,15 +522,16 @@ func (p *parser) newFnDecl(idNode *ast.Node) *ast.Node {
 	})
 }
 
-func (p *parser) fnDeclAppenParam(fnDecl, id, plType *ast.Node) *ast.Node {
+func (p *parser) fnDeclAppenParam(fnDecl, id, plType, defaultValue *ast.Node) *ast.Node {
 	if fnDecl.NodeType != ast.TypeFuncDeclStmt {
 		p.addParseErrf(p.yyParser.lval.item.PositionRange(),
 			"%s object is not FuncDeclStmt", fnDecl.NodeType)
 		return nil
 	}
 	fnDecl.FnDeclStmt.Param = append(fnDecl.FnDeclStmt.Param, &ast.FnParam{
-		Name: id.Identifier.Name,
-		Type: plType,
+		Name:       id.Identifier.Name,
+		Type:       plType,
+		DefaultVal: defaultValue,
 	})
 	return fnDecl
 }

@@ -131,10 +131,16 @@ func (e *MapInitExpr) Format() []string {
 		lines = e.Type.Format()
 	}
 
-	lines = nodeFAppendConnect(lines, []string{"{"})
+	lines = nodeFAppendConcStr(lines, "{")
 
-	for _, item := range e.KeyValeList {
-		lines = append(lines, TabStr+item[0].String()+": "+item[1].String()+",")
+	for i, item := range e.KeyValeList {
+		if i != 0 {
+			lines = nodeFAppendConcStr(lines, ",")
+		}
+		lines = append(lines, TabStr)
+		lines = nodeFAppendTabConnect(lines, item[0].Format())
+		lines = nodeFAppendConcStr(lines, ": ")
+		lines = nodeFAppendTabConnect(lines, item[1].Format())
 	}
 	lines = append(lines, "}")
 
@@ -154,16 +160,22 @@ type ListInitExpr struct {
 }
 
 func (e *ListInitExpr) Format() []string {
-	lines := []string{"["}
+	lines := []string{}
+
+	if e.Type != nil {
+		lines = e.Type.Format()
+	}
+	lines = nodeFAppendConcStr(lines, "[")
+
 	for i, elem := range e.List {
 		if i == 0 {
-			lines = nodeFAppendConnect(lines, elem.Format())
+			lines = nodeFAppendTabConnect(lines, elem.Format())
 		} else {
-			lines = nodeFAppendConnect(lines, []string{", "})
-			lines = nodeFAppendConnect(lines, elem.Format())
+			lines = nodeFAppendConcStr(lines, ", ")
+			lines = nodeFAppendTabConnect(lines, elem.Format())
 		}
 	}
-	lines = nodeFAppendConnect(lines, []string{"]"})
+	lines = nodeFAppendConcStr(lines, "]")
 	return lines
 }
 
@@ -179,7 +191,7 @@ type ConditionalExpr struct {
 
 func (e *ConditionalExpr) Format() []string {
 	lines := e.LHS.Format()
-	lines = nodeFAppendConnect(lines, []string{" " + string(e.Op) + " "})
+	lines = nodeFAppendConcStr(lines, " "+string(e.Op)+" ")
 	lines = nodeFAppendConnect(lines, e.RHS.Format())
 	return lines
 }
@@ -196,7 +208,7 @@ type ArithmeticExpr struct {
 
 func (e *ArithmeticExpr) Format() []string {
 	lines := e.LHS.Format()
-	lines = nodeFAppendConnect(lines, []string{" " + string(e.Op) + " "})
+	lines = nodeFAppendConcStr(lines, " "+string(e.Op)+" ")
 	lines = nodeFAppendConnect(lines, e.RHS.Format())
 	return lines
 }
@@ -216,7 +228,7 @@ func (e *AttrExpr) Format() []string {
 
 	if e.Attr != nil {
 		lines = e.Attr.Format()
-		lines = nodeFAppendConnect(lines, []string{"."})
+		lines = nodeFAppendConcStr(lines, ".")
 	}
 
 	if e.Obj != nil {

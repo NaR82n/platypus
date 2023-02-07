@@ -219,22 +219,21 @@ func (e *VarbDeclStmt) Format() []string {
 	lines := []string{""}
 
 	for i, v := range e.VarbDeclAndAssi {
-		curLine := len(lines) - 1
-
 		if i == 0 {
-			lines[curLine] = "let"
+			lines = nodeFAppendConcStr(lines, "let ")
 		} else {
-			lines[curLine] += ", "
+			lines = nodeFAppendConcStr(lines, ", ")
 		}
 
 		if v[0] != nil {
-			lines[curLine] += v[0].String()
+			lines = nodeFAppendConnect(lines, v[0].Format())
 		}
 		if v[1] != nil {
-			lines[curLine] += ": " + v[1].String()
+			lines = nodeFAppendConcStr(lines, ": ")
+			lines = nodeFAppendConnect(lines, v[1].Format())
 		}
 		if v[2] != nil {
-			lines[curLine] += " = "
+			lines = nodeFAppendConcStr(lines, " = ")
 			lines = nodeFAppendConnect(lines, v[2].Format())
 		}
 	}
@@ -305,42 +304,49 @@ type FnParam struct {
 	DefaultVal *Node
 }
 
-func (p *FnParam) String() string {
-	v := p.Name
+func (p *FnParam) Format() []string {
+	lines := []string{p.Name}
 	if p.Type != nil {
-		v += ": " + p.Type.String()
+		lines = nodeFAppendConcStr(lines, ": ")
+		lines = nodeFAppendConnect(lines, p.Type.Format())
 	}
+
 	if p.DefaultVal != nil {
-		v += " = " + p.DefaultVal.String()
+		lines = nodeFAppendConcStr(lines, " = ")
+		lines = nodeFAppendConnect(lines, p.DefaultVal.Format())
 	}
-	return v
+
+	return lines
+}
+
+func (p *FnParam) String() string {
+	return strings.Join(p.Format(), "\n")
 }
 
 func (decl *FuncDeclStmt) Format() []string {
-	var lines []string
-
-	var p string
+	lines := []string{"fn " + decl.Name + "("}
 
 	for i, v := range decl.Param {
 		if i != 0 {
-			p += ", "
+			lines = nodeFAppendConcStr(lines, ", ")
 		}
-		p += v.String()
+		lines = nodeFAppendConnect(lines, v.Format())
 	}
+	lines = nodeFAppendConcStr(lines, ") ")
 
-	if len(decl.ReturnType) > 0 {
-		var r string
+	if len(decl.ReturnType) > 1 {
+		lines = nodeFAppendConcStr(lines, "-> (")
 		for i, v := range decl.ReturnType {
 			if i != 0 {
-				r += ", "
+				lines = nodeFAppendConcStr(lines, ", ")
 			}
-			r += v.String()
+			lines = nodeFAppendConnect(lines, v.Format())
 		}
-		lines = append(lines, fmt.Sprintf("fn %s(%s) -> %s ",
-			decl.Name, p, r))
-	} else {
-		lines = append(lines, fmt.Sprintf("fn %s(%s) ",
-			decl.Name, p))
+		lines = nodeFAppendConcStr(lines, ") ")
+	} else if len(decl.ReturnType) == 1 {
+		lines = nodeFAppendConcStr(lines, "-> ")
+		lines = nodeFAppendConnect(lines, decl.ReturnType[0].Format())
+		lines = nodeFAppendConcStr(lines, " ")
 	}
 
 	lines = nodeFAppendConnect(lines, decl.Block.Format())

@@ -295,16 +295,34 @@ func_call_args	: func_call_args COMMA expr
 
 binary_expr: conditional_expr | arithmeticExpr ;
 
-varb_decl_stmt: LET identifier EQ expr
+varb_decl_stmt: LET identifier
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, nil) 
+		}	
+	| LET identifier EQ expr
+		{ 
+			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, $4) 
 		}	
 	| LET identifier COLON all_type EQ expr
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
+			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, $6) 
 		}	
-	| varb_decl_stmt COMMA identifier COLON all_type EQ expr
+	| varb_decl_stmt COMMA identifier
+		{
+			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, nil) 
+		}
 	| varb_decl_stmt COMMA identifier EQ expr
+		{
+			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, $5) 
+		}
+	| varb_decl_stmt COMMA identifier COLON all_type EQ expr
+		{
+			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, $7) 
+		}
+
 	;
 
 assignment_expr: index_expr EQ expr
@@ -640,20 +658,38 @@ fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block
 fn_decl_start: FN identifier LEFT_PAREN identifier
 		{
 			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil, nil)
 		}
 	| FN identifier LEFT_PAREN identifier COLON all_type
 		{
 			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6, nil)
 		}
 	| fn_decl_start COMMA identifier
 		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil, nil)
 		}
 	| fn_decl_start COMMA identifier COLON all_type
 		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5, nil)
+		}
+	| FN identifier LEFT_PAREN identifier EQ expr
+		{
+			$$ = yylex.(*parser).newFnDecl($2)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil, $6)
+		}
+	| FN identifier LEFT_PAREN identifier COLON all_type EQ expr
+		{
+			$$ = yylex.(*parser).newFnDecl($2)
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6, $8)
+		}
+	| fn_decl_start COMMA identifier EQ expr
+		{
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil, $5)
+		}
+	| fn_decl_start COMMA identifier COLON all_type EQ expr
+		{
+			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5, $7)
 		}
 	;
 %%
