@@ -273,18 +273,18 @@ func TestParseType(t *testing.T) {
 	}{
 		{
 			in: `
-[]int [[]int [1,2,3], map[string][]int {1:2}, {"a": "v"}, [1,2]]; a=1
+[[=]int [1,2,3], map[string][=]int {1:2}, {"a": "v"}, [1,2]]; a=1
 
-let a :int = 1; let b: a = 1; let a = []a [1]; ; let a=  (b=2), c = []int [1,3,], d, f= {"a": []any[1,2,3, map[x]y {x:1}, {y:1}]}`,
+let a :int = 1; let b: a = 1; let a = [=]a [1]; ; let a=  (b=2), c = [=]int [1,3,], d, f= {"a": [=]any[1,2,3, map[x]y {x:1}, {y:1}]}`,
 		},
 		{
-			in: "struct a {x, v: int, b: a, z:any, d: map[string][]map[string]int}",
+			in: "struct a {x, v: int, b: a, z:any, d: map[string][=]map[string]int}",
 		},
 		{
-			in: "map[int][]int",
+			in: "map[int][=]int",
 		},
 		{
-			in: "[]any [1,3]",
+			in: "[=]any [1,3]",
 		},
 		{
 			in: "fn a(b: int = {a: 1}) -> map[string]int { a =1; map[string]int {a: 1, b:2}}",

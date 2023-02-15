@@ -13,12 +13,25 @@ import (
 var InvalidPos = -1
 
 var InvalidLnColPos = LnColPos{
-	Pos: -1,
-	Ln:  -1,
-	Col: -1,
+	Pos: NoPos,
+	Ln:  int(NoPos),
+	Col: int(NoPos),
 }
 
+const (
+	_unset Token = iota
+	Int
+	Float
+	Str
+	Bool
+	Nil
+)
+
+type Token int
+
 type Pos int
+
+const NoPos Pos = -1
 
 type LnColPos struct {
 	Pos Pos
