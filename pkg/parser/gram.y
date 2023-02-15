@@ -29,7 +29,7 @@ import (
 	LEFT_PAREN LEFT_BRACKET LEFT_BRACE RIGHT_BRACE
 	RIGHT_PAREN RIGHT_BRACKET SPACE STRING QUOTED_STRING MULTILINE_STRING
 	FOR IN WHILE BREAK CONTINUE	RETURN EOL COLON
-	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB
+	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB BitwiseAND
 
 // operator
 %token operatorsStart
@@ -79,7 +79,7 @@ NIL NULL IF ELIF ELSE
 
 %type <node>
 	stmt
-	assignment_expr
+	assignment_stmt
 	varb_decl_stmt
 	for_in_stmt
 	for_stmt
@@ -88,10 +88,14 @@ NIL NULL IF ELIF ELSE
 	ifelse_stmt
 	call_expr
 	map_type
-	list_type
-	base_type
+	basic_type
 	all_type
-	ptr_type
+	array_type
+	point_type
+	unary_expr
+	/* conv_expr */
+	func_arg
+	func_args
 
 %type <node>
 	identifier
@@ -102,10 +106,11 @@ NIL NULL IF ELIF ELSE
 	index_expr
 	attr_expr
 	expr
+	func_type
 	map_init
 	map_init_start
-	list_init
-	list_init_start
+	array_literal
+	array_init_start
 	array_elem
 	bool_literal
 	string_literal
@@ -116,8 +121,6 @@ NIL NULL IF ELIF ELSE
 	struct_type_decl_stmt
 	fn_decl_start
 	fn_decl_stmt
-	get_p_expr
-	p_get_expr
 	//columnref
 
 %start start
@@ -179,26 +182,107 @@ stmt	: ifelse_stmt
 	| struct_type_decl_stmt
 	| varb_decl_stmt
 	| fn_decl_stmt
+	| assignment_stmt
 	;
 
 
 value_stmt: expr
 	;
 
-/* expression */
-expr	: array_elem | get_p_expr | p_get_expr | assignment_expr | list_init | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+all_type: basic_type
+	| array_type
+	| map_type
+	| identifier
+	| point_type
+	| func_type
+	| LEFT_PAREN all_type RIGHT_PAREN
+		{
+			$$ = $2
+		}
+	;
 
-
-get_p_expr: MUL expr 
+point_type: MUL all_type
 	{
 		$$ = $2
 	}
 	;
 
-p_get_expr:  BitwiseAND expr
-	{
-		$$ = $2
-	}
+
+basic_type: INT 
+		{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| FLOAT
+    	{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| BOOL
+    	{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| STR
+	   	{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	| ANY
+    	{
+			$$ = yylex.(*parser).newNamedType($1.Val, 0)
+		}
+	;
+
+
+array_type: LEFT_BRACKET EQ RIGHT_BRACKET all_type
+		{	
+			$$ = yylex.(*parser).newListType($4)
+		}
+	| LEFT_BRACKET EQ number_literal RIGHT_BRACKET all_type
+		{
+			$$ = yylex.(*parser).newListType($5)
+		}
+	;
+
+map_type : MAP LEFT_BRACKET all_type RIGHT_BRACKET all_type
+		{	
+			$$ = yylex.(*parser).newMapType($3, $5)
+		}
+	;
+
+func_arg: identifier
+		{ $$ = $1 }
+    | identifier EQ expr
+		{ $$ = $1 }
+    | identifier COLON all_type
+		{ $$ = $1 }
+    | identifier COLON all_type EQ expr
+		{ $$ = $1 }
+    ;
+
+func_args: func_arg
+    | func_args COMMA func_arg
+		{ $$ = $1 }
+
+func_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
+		{ $$ = &ast.Node{} }
+    | FN LEFT_PAREN RIGHT_PAREN RET_SYMB all_type
+		{ $$ = &ast.Node{} }
+    | FN LEFT_PAREN func_args RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+    | FN LEFT_PAREN RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+    ;
+
+/* expression */
+expr	: array_elem | unary_expr | array_literal | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+
+/* conv_expr: 	LEFT_PAREN identifier RIGHT_PAREN LEFT_PAREN expr RIGHT_PAREN
+		{ $$ = $2 }
+	; */
+
+unary_expr: MUL expr
+		{ $$ = $2 }
+	| BitwiseAND expr
+		{ $$ = $2 }
+
 	;
 
 break_stmt: BREAK
@@ -305,6 +389,8 @@ func_call_args	: func_call_args COMMA expr
 		| func_call_args COMMA
 		| expr
 			{ $$ = []*plast.Node{$1} }
+		| identifier EQ expr
+			{ $$ = []*plast.Node{$1} }
 		;
 
 
@@ -349,7 +435,7 @@ varb_decl_stmt: LET identifier
 
 	;
 
-assignment_expr: index_expr EQ expr
+assignment_stmt: index_expr EQ expr
         { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
 	| attr_expr EQ expr
         { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
@@ -443,11 +529,16 @@ attr_expr	: identifier DOT index_expr
 		;
 
 
-list_init :list_init_start RIGHT_BRACKET
+expr_comma_expr: expr COMMA expr
+		{ $$ }
+	| expr_comma_expr COMMA expr
+	;
+
+array_literal :array_init_start RIGHT_BRACKET
 			{
 				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
 			}
-		| list_init_start COMMA RIGHT_BRACKET
+		| array_init_start COMMA RIGHT_BRACKET
 			{
 				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
 			}
@@ -458,21 +549,21 @@ list_init :list_init_start RIGHT_BRACKET
 			}
 		;
 
-list_init_start :  LEFT_BRACKET expr
+array_init_start :  LEFT_BRACKET expr
 			{ 
 				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
 				$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
 			}
-		/* | list_type LEFT_BRACKET expr
+		| array_type LEFT_BRACKET expr
 			{ 
 				$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
 				$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-			} */
-		| list_init_start COMMA expr
+			}
+		| array_init_start COMMA expr
 				{				
 					$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
 				}
-		| list_init_start EOL
+		| array_init_start EOL
 	;
 
 
@@ -589,55 +680,6 @@ identifier: ID
 
 
 unary_op	: ADD | SUB ;
-
-
-all_type: base_type | list_type | map_type | ptr_type;
-
-ptr_type: MUL all_type
-	{
-		$$ = $2
-	}
-	;
-
-base_type: BOOL
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
-	| INT
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
-	| FLOAT
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
-	| STR
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
-	| ANY
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
-	| identifier
-		{
-			$$ = yylex.(*parser).newNamedType($1.Identifier.Name, 0)
-		}
-	;
-
-
-list_type: LEFT_BRACKET RIGHT_BRACKET all_type
-		{	
-			$$ = yylex.(*parser).newListType($3)
-		}
-	;
-
-map_type : MAP LEFT_BRACKET base_type RIGHT_BRACKET all_type
-		{	
-			$$ = yylex.(*parser).newMapType($3, $5)
-		}
-	;
-
 
 struct_type_decl_start : STRUCT identifier LEFT_BRACE identifier
 		{
