@@ -134,15 +134,18 @@ var (
 		MUL:        "*",
 		MOD:        "%",
 		DIV:        "/",
+		NOT:        "!",
 		NEQ:        "!=",
 		LTE:        "<=",
 		LT:         "<",
 		GTE:        ">=",
 		GT:         ">",
 		BitwiseAND: "&",
-		// XOR: "^",
-		AND: "&&",
-		OR:  "||",
+		BitwiseXOR: "^",
+		BitwiseOR:  "|",
+		BitwiseNOT: "~",
+		AND:        "&&",
+		OR:         "||",
 	}
 
 	AstOp = func(op ItemType) ast.Op {

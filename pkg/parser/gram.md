@@ -39,7 +39,6 @@
     "==":         EQEQ,
     ";":          SEMICOLON,
     ".":          DOT,
-    "<space>":    SPACE,
     ":":          COLON,
     "-":          SUB,
     "+":          ADD,
@@ -52,7 +51,7 @@
     ">=":         GTE,
     ">":          GT,
     "&":          BitwiseAND,
-    // "^":        XOR,
+    "^":          XOR,
     "&&":         AND,
     "||":         OR
 }
@@ -170,41 +169,75 @@ paren_expr: LEFT_PRAEN expr RIGHT_PAREN
     ;
 ```
 
-**AttrExpr**
+
+**AttrExpr/IndexExpr/SliceExpr/CallExpr**
 ```yacc
-attr_expr: identifier DOT index_expr
-    | identifier DOT identifier
-    | identifier DOT call_expr
-    | index_expr DOT index_expr
-    | index_expr DOT identifier
-    | index_expr DOT call_expr
-    | attr_expr DOT index_expr
-    | attr_expr DOT identifier
-    | attr_expr DOT call_expr
-    ;
+suffix_expr: 
+    // index_expr
+      identifier LEFT_BRACKET expr RIGHT_BRACKET
+	| identifier LEFT_PAREN func_call_args RIGHT_PAREN
+	| DOT LEFT_BRACKET expr RIGHT_BRACKET
+    
+	// slice_expr
+	| identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+	| identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+
+	// attr_expr
+	| identifier DOT identifier
+
+	// call_expr
+	| identifier LEFT_PAREN RIGHT_PAREN
+	| identifier LEFT_PAREN func_call_args EOLS RIGHT_PAREN
+	| identifier LEFT_PAREN EOLS RIGHT_PAREN
+
+    // + index_expr
+	| suffix_expr LEFT_BRACKET expr RIGHT_BRACKET // index_expr
+	| suffix_expr LEFT_PAREN func_call_args RIGHT_PAREN
+
+	// + slice_expr
+	| suffix_expr LEFT_BRACKET expr COLON expr RIGHT_BRACKET
+	| suffix_expr LEFT_BRACKET expr COLON expr COLON expr RIGHT_BRACKET
+
+	// + attr_expr
+	| suffix_expr DOT identifier
+
+	// + call_expr
+	| suffix_expr LEFT_PAREN RIGHT_PAREN
+	| suffix_expr LEFT_PAREN func_call_args EOLS RIGHT_PAREN
+	| suffix_expr LEFT_PAREN EOLS RIGHT_PAREN
+
+	;
 ```
 
-**IndexExpr/IndexListExpr**
+**BinaryExpr**
 ```yacc
-index_expr: identifier LEFT_BRACKET expr RIGHT_BRACKET
-    // Only for function "json"
-    | DOT LEFT_BRACKET expr RIGHT_BRACKET
-    | index_expr LEFT_BRACKET expr RIGHT_BRACKET
-    ;
+binary_expr: expr GTE expr
+    | expr GT expr
+    | expr OR expr
+    | expr AND expr
+    | expr LT expr
+    | expr LTE expr
+    | expr NEQ expr
+    | expr EQEQ expr
+    | expr BitwiseAND expr
+    | expr BitwiseXOR expr
+    | expr BitwiseOR expr
+    | expr ADD expr
+    | expr SUB expr
+    | expr MUL expr
+    | expr DIV expr
+    | expr MOD expr
 ```
 
-**SliceExpr**
+**UnaryExpr**
 ```yacc
-slice_expr: idenfier LEFT_BRACKET expr COLON expr RIGHT_BRACKET
-    | identifer LEFT_BRACKET expr COLON expr COLON expr RIGTH_BRACKET
-    ;
+unary_expr: MUL expr
+	| BitwiseAND expr
+    | ADD expr %prec UMINUS
+    | SUB expr %prec UMIUNS
+    | NOT expr
+    | BitwiseNOT expr
+	;
 ```
 
-**CallExpr**:
-
-```yacc
-call_expr: identifier LEFT_PAREN call_args RIGTH_PAREN
-    | identifier LEFT_PAREN RIGTH_PAREN
-    ;
-```
-
+## Stmt

@@ -29,7 +29,8 @@ import (
 	LEFT_PAREN LEFT_BRACKET LEFT_BRACE RIGHT_BRACE
 	RIGHT_PAREN RIGHT_BRACKET SPACE STRING QUOTED_STRING MULTILINE_STRING
 	FOR IN WHILE BREAK CONTINUE	RETURN EOL COLON
-	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB BitwiseAND
+	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB NOT
+	BitwiseXOR BitwiseOR BitwiseNOT BitwiseAND
 
 // operator
 %token operatorsStart
@@ -54,8 +55,8 @@ NIL NULL IF ELIF ELSE
 ////////////////////////////////////////////////////
 // grammar rules
 ////////////////////////////////////////////////////
-%type <item>
-	unary_op
+/* %type <item>
+	unary_op */
 
 
 %type<astblock>
@@ -86,8 +87,8 @@ NIL NULL IF ELIF ELSE
 	continue_stmt
 	break_stmt
 	ifelse_stmt
+	expr
 	expr_or_empty
-	call_expr
 	map_type
 	basic_type
 	all_type
@@ -97,24 +98,20 @@ NIL NULL IF ELIF ELSE
 	/* conv_expr */
 	func_arg
 	func_args
-	slice_expr
 
 %type <node>
 	identifier
 	binary_expr
-	conditional_expr
-	arithmeticExpr
 	paren_expr
-	index_expr
-	attr_expr
-	expr
+	/* expr */
+	suffix_expr
 	func_type
 	composite_literal
 	key_value_expr
 	composite_literal_start
 	array_literal
 	array_init_start
-	array_elem
+	/* array_elem */
 	bool_literal
 	string_literal
 	nil_literal
@@ -132,11 +129,15 @@ NIL NULL IF ELIF ELSE
 %right EQ
 %left OR
 %left AND
-%left BitwiseAND
-%left GTE GT NEQ EQEQ LTE LT
+%left EQEQ NEQ
+%left GTE GT LTE LT
+%right BitwiseOR
+%right BitwiseXOR
+%right BitwiseAND
 %left ADD SUB
 %left MUL DIV MOD
-
+%right BitwiseNOT NOT UMINUS // ADD SUB MUL BitwiseAND
+%left LEFT_BRACKET RIGHT_BRACKET LEFT_PAREN RIGHT_PAREN DOT
 %%
 
 
@@ -275,17 +276,30 @@ func_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
     ;
 
 /* expression */
-expr	: array_elem | slice_expr | unary_expr | array_literal | composite_literal | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+expr	: bool_literal
+		| string_literal
+		| nil_literal
+		| number_literal
+		| identifier
+		/* | conv_expr */
+		| unary_expr  | suffix_expr | array_literal | composite_literal | paren_expr | binary_expr ; // arithmeticExpr
 
-/* conv_expr: 	LEFT_PAREN identifier RIGHT_PAREN LEFT_PAREN expr RIGHT_PAREN
+/* conv_expr: 	LEFT_PAREN all_type RIGHT_PAREN paren_expr
 		{ $$ = $2 }
 	; */
 
-unary_expr: MUL expr
+unary_expr: MUL expr %prec UMINUS 
 		{ $$ = $2 }
-	| BitwiseAND expr
+	| BitwiseAND expr %prec UMINUS 
 		{ $$ = $2 }
-
+	| ADD expr %prec UMINUS 
+		{ $$ = $2 }
+	| SUB expr %prec UMINUS 
+		{ $$ = $2 }
+	| NOT expr
+		{ $$ = $2 }
+	| BitwiseNOT expr
+		{ $$ = $2 }
 	;
 
 break_stmt: BREAK
@@ -366,25 +380,6 @@ empty_block : LEFT_BRACE RIGHT_BRACE
 	;
 
 
-call_expr : identifier LEFT_PAREN func_call_args RIGHT_PAREN
-		{
-			$$ = yylex.(*parser).newCallExpr($1, $3, $2, $4)
-		}
-	| identifier LEFT_PAREN RIGHT_PAREN
-		{
-			$$ = yylex.(*parser).newCallExpr($1, nil, $2, $3)
-		}
-	| identifier LEFT_PAREN func_call_args EOLS RIGHT_PAREN
-		{
-			$$ = yylex.(*parser).newCallExpr($1, $3, $2, $5)
-		}
-	| identifier LEFT_PAREN EOLS RIGHT_PAREN
-		{
-			$$ = yylex.(*parser).newCallExpr($1, nil, $2, $4)
-		}
-	;
-
-
 func_call_args	: func_call_args COMMA expr
 			{
 			$$ = append($$, $3)
@@ -395,9 +390,6 @@ func_call_args	: func_call_args COMMA expr
 		| identifier EQ expr
 			{ $$ = []*plast.Node{$1} }
 		;
-
-
-binary_expr: conditional_expr | arithmeticExpr ;
 
 varb_decl_stmt: LET identifier
 		{ 
@@ -438,15 +430,13 @@ varb_decl_stmt: LET identifier
 
 	;
 
-assignment_stmt: index_expr EQ expr
+assignment_stmt: suffix_expr EQ expr
         { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
-	| attr_expr EQ expr
-        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
 	| identifier EQ expr
 		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
 	;
 
-conditional_expr	: expr GTE expr
+binary_expr	: expr GTE expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
 			| expr GT expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
@@ -463,13 +453,12 @@ conditional_expr	: expr GTE expr
 			| expr EQEQ expr
 				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
 			| expr BitwiseAND expr
-				{
-					$$ = $1
-				}
-			;
-
-
-arithmeticExpr	: expr ADD expr
+				{ $$ = $1 }
+			| expr BitwiseXOR expr
+				{ $$ = $1 }
+			| expr BitwiseOR expr
+				{ $$ = $1 }
+			| expr ADD expr
 				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
 			| expr SUB expr
 				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
@@ -493,70 +482,55 @@ EOLS: EOL
 	| EOLS EOL
 	;
 
-index_expr	: identifier LEFT_BRACKET expr RIGHT_BRACKET
-			{ $$ = yylex.(*parser).newIndexExpr($1, $2 ,$3, $4) }
-		| DOT LEFT_BRACKET expr RIGHT_BRACKET	
-			// 兼容原有语法，仅作为 json 函数的第二个参数
-			{ $$ = yylex.(*parser).newIndexExpr(nil, $2, $3, $4) }
-		| index_expr LEFT_BRACKET expr RIGHT_BRACKET
-			{ $$ = yylex.(*parser).newIndexExpr($1, $2, $3, $4) }
-		;
-
-
-// TODO 实现结构体或类，当前不进行取值操作
-// 仅用于 json 函数
-attr_expr	: identifier DOT index_expr
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| identifier DOT identifier
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| identifier DOT call_expr
-			{
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| index_expr DOT index_expr
-			{ 
-				$$ = yylex.(*parser).newAttrExpr($1, $3)
-			}
-	  	| index_expr DOT identifier
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| index_expr DOT call_expr
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| attr_expr DOT index_expr
-			{ 
-				$$ = yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| attr_expr DOT identifier
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		| attr_expr DOT call_expr
-			{ 
-				$$ =  yylex.(*parser).newAttrExpr($1, $3)
-			}
-		;
-
+// index_expr, attr_expr, call_expr, slice_expr
+suffix_expr: 
+	// index_expr
+	  identifier LEFT_BRACKET expr RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_PAREN func_call_args RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	| DOT LEFT_BRACKET expr RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	// slice_expr
+	| identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	// attr_expr
+	| identifier DOT identifier
+		{ $$ = &ast.Node{} }
+	// call expr
+	| identifier LEFT_PAREN RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_PAREN func_call_args EOLS RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_PAREN EOLS RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	// index_expr
+	| suffix_expr LEFT_BRACKET expr RIGHT_BRACKET // index_expr
+		{ $$ = &ast.Node{} }
+	| suffix_expr LEFT_PAREN func_call_args RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	// slice_expr
+	| suffix_expr LEFT_BRACKET expr COLON expr RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	| suffix_expr LEFT_BRACKET expr COLON expr COLON expr RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	// attr_expr
+	| suffix_expr DOT identifier
+		{ $$ = &ast.Node{} }
+	// call expr
+	| suffix_expr LEFT_PAREN RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	| suffix_expr LEFT_PAREN func_call_args EOLS RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	| suffix_expr LEFT_PAREN EOLS RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	;
 
 expr_or_empty: expr
 	| 
 		{ $$ = nil }
-	;
-
-slice_expr: identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
-		{ $$ = &ast.Node{} }
-	|  identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
-		{ $$ = &ast.Node{} }
-	| call_expr LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
-		{ $$ = &ast.Node{} }
-	| call_expr LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
-		{ $$ = &ast.Node{} }
 	;
 
 array_literal: array_init_start EOLS RIGHT_BRACKET
@@ -672,12 +646,12 @@ composite_literal_start: LEFT_BRACE key_value_expr COMMA
 	;
 
 
-array_elem	: bool_literal
+/* array_elem	: bool_literal
 		| string_literal
 		| nil_literal
 		| number_literal
 		| identifier
-		;
+		; */
 
 /*
 	literal:
@@ -715,7 +689,7 @@ nil_literal	: NIL
 
 number_literal	: NUMBER
 			{ $$ =  yylex.(*parser).newNumberLiteral($1) }
-		| unary_op NUMBER
+		/* | unary_op NUMBER
 			{
 			num :=  yylex.(*parser).newNumberLiteral($2) 
 			switch $1.Typ {
@@ -731,7 +705,7 @@ number_literal	: NUMBER
 				}
 			}
 			$$ = num
-			}
+			} */
 		;
 
 identifier: ID
@@ -746,7 +720,7 @@ identifier: ID
 		;
 
 
-unary_op	: ADD | SUB ;
+/* unary_op	: ADD | SUB ; */
 
 struct_type_decl_start : STRUCT identifier LEFT_BRACE identifier
 		{
