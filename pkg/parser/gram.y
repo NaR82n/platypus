@@ -86,16 +86,18 @@ NIL NULL IF ELIF ELSE
 	continue_stmt
 	break_stmt
 	ifelse_stmt
+	expr_or_empty
 	call_expr
 	map_type
 	basic_type
 	all_type
 	array_type
-	point_type
+	ptr_type
 	unary_expr
 	/* conv_expr */
 	func_arg
 	func_args
+	slice_expr
 
 %type <node>
 	identifier
@@ -107,8 +109,9 @@ NIL NULL IF ELIF ELSE
 	attr_expr
 	expr
 	func_type
-	map_init
-	map_init_start
+	composite_literal
+	key_value_expr
+	composite_literal_start
 	array_literal
 	array_init_start
 	array_elem
@@ -173,7 +176,7 @@ stmts_list	: stmt sep
 		}
 	;
 
-stmt	: ifelse_stmt
+stmt: ifelse_stmt
 	| for_in_stmt
 	| for_stmt
 	| continue_stmt
@@ -193,7 +196,7 @@ all_type: basic_type
 	| array_type
 	| map_type
 	| identifier
-	| point_type
+	| ptr_type
 	| func_type
 	| LEFT_PAREN all_type RIGHT_PAREN
 		{
@@ -201,7 +204,7 @@ all_type: basic_type
 		}
 	;
 
-point_type: MUL all_type
+ptr_type: MUL all_type
 	{
 		$$ = $2
 	}
@@ -272,7 +275,7 @@ func_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
     ;
 
 /* expression */
-expr	: array_elem | unary_expr | array_literal | map_init | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
+expr	: array_elem | slice_expr | unary_expr | array_literal | composite_literal | paren_expr | call_expr | binary_expr | attr_expr | index_expr ; // arithmeticExpr
 
 /* conv_expr: 	LEFT_PAREN identifier RIGHT_PAREN LEFT_PAREN expr RIGHT_PAREN
 		{ $$ = $2 }
@@ -510,11 +513,19 @@ attr_expr	: identifier DOT index_expr
 			{ 
 				$$ =  yylex.(*parser).newAttrExpr($1, $3)
 			}
+		| identifier DOT call_expr
+			{
+				$$ =  yylex.(*parser).newAttrExpr($1, $3)
+			}
 		| index_expr DOT index_expr
 			{ 
 				$$ = yylex.(*parser).newAttrExpr($1, $3)
 			}
 	  	| index_expr DOT identifier
+			{ 
+				$$ =  yylex.(*parser).newAttrExpr($1, $3)
+			}
+		| index_expr DOT call_expr
 			{ 
 				$$ =  yylex.(*parser).newAttrExpr($1, $3)
 			}
@@ -526,52 +537,80 @@ attr_expr	: identifier DOT index_expr
 			{ 
 				$$ =  yylex.(*parser).newAttrExpr($1, $3)
 			}
+		| attr_expr DOT call_expr
+			{ 
+				$$ =  yylex.(*parser).newAttrExpr($1, $3)
+			}
 		;
 
 
-expr_comma_expr: expr COMMA expr
-		{ $$ }
-	| expr_comma_expr COMMA expr
+expr_or_empty: expr
+	| 
+		{ $$ = nil }
 	;
 
-array_literal :array_init_start RIGHT_BRACKET
-			{
-				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-			}
-		| array_init_start COMMA RIGHT_BRACKET
-			{
-				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-			}
-		| LEFT_BRACKET RIGHT_BRACKET
-			{ 
-				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
-				$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-			}
-		;
+slice_expr: identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	|  identifier LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	| call_expr LEFT_BRACKET expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	| call_expr LEFT_BRACKET expr_or_empty COLON expr_or_empty COLON expr_or_empty RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
+	;
+
+array_literal: array_init_start EOLS RIGHT_BRACKET
+		{
+			$$ = yylex.(*parser).newListInitEndExpr($$, $3.Pos)
+		}
+	| array_init_start RIGHT_BRACKET
+		{
+			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
+		}
+	| array_init_start COMMA RIGHT_BRACKET
+		{
+			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
+		}
+	| LEFT_BRACKET RIGHT_BRACKET
+		{ 
+			$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
+			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
+		}
+	| array_type LEFT_BRACKET RIGHT_BRACKET
+		{ 
+			$$ = yylex.(*parser).newListInitStartExpr($2.Pos, nil)
+			$$ = yylex.(*parser).newListInitEndExpr($$, $3.Pos)
+		}
+	;
 
 array_init_start :  LEFT_BRACKET expr
-			{ 
-				$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
-				$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
-			}
-		| array_type LEFT_BRACKET expr
-			{ 
-				$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
-				$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-			}
-		| array_init_start COMMA expr
-				{				
-					$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-				}
-		| array_init_start EOL
+		{ 
+			$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
+			$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
+		}
+	| array_type LEFT_BRACKET expr
+		{ 
+			$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
+			$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
+		}
+	| array_init_start COMMA expr
+		{				
+			$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
+		}
 	;
 
+key_value_expr: expr COLON expr
+	;
 
-map_init : map_init_start RIGHT_BRACE
+composite_literal : composite_literal_start RIGHT_BRACE
 			{
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.Pos)
 			}
-		| map_init_start COMMA RIGHT_BRACE
+		| composite_literal_start expr RIGHT_BRACE
+			{
+				$$ = yylex.(*parser).newMapInitEndExpr($$, $3.Pos)
+			}
+		| composite_literal_start key_value_expr RIGHT_BRACE
 			{
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $3.Pos)
 			}
@@ -585,23 +624,51 @@ map_init : map_init_start RIGHT_BRACE
 				$$ = yylex.(*parser).newMapInitStartExpr($2.LBracePos.Pos, $1)
 				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.RBracePos.Pos)
 			}
+		| identifier empty_block
+			{ 
+				$$ = yylex.(*parser).newMapInitStartExpr($2.LBracePos.Pos, $1)
+				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.RBracePos.Pos)
+			}
 		;
 
-map_init_start: LEFT_BRACE expr COLON expr
+composite_literal_start: LEFT_BRACE key_value_expr COMMA
 		{ 
 			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
-			$$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
 		}
-	| map_type LEFT_BRACE expr COLON expr
+	| LEFT_BRACE expr COMMA
 		{ 
 			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
-			$$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
-		} 
-	| map_init_start COMMA expr COLON expr
-		{
-			$$ = yylex.(*parser).newMapInitAppendExpr($1, $3, $5)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
 		}
-	| map_init_start EOL
+	| map_type LEFT_BRACE key_value_expr COMMA
+		{ 
+			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
+		}
+	| map_type LEFT_BRACE expr COMMA
+		{ 
+			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
+		} 
+	| identifier LEFT_BRACE key_value_expr COMMA
+		{ 
+			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
+		}
+	| identifier LEFT_BRACE expr COMMA
+		{ 
+			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
+			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
+		} 
+	| composite_literal_start  key_value_expr  COMMA
+		{
+			$$ = yylex.(*parser).newMapInitAppendExpr($1, nil, nil)
+		}
+	| composite_literal_start expr  COMMA
+		{
+			$$ = yylex.(*parser).newMapInitAppendExpr($1, nil, nil)
+		}
 	;
 
 
