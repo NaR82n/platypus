@@ -62,13 +62,20 @@
 
 **Expr**
 ```yacc
-expr: identifier | call_expr
+expr: bool_literal
+    | string_literal
+    | nil_literal
+    | number_literal
+    | identifier
+    /* | conv_expr */
+    | unary_expr  | suffix_expr | array_literal | composite_literal | paren_expr | binary_expr ; // arithmeticExpr
     ;
 ```
 
 **Identifier**:
 ```yacc
 identifier: QUOTED_STRING
+        { $$ = &ast.Node{} }
     ;
 ```
 
@@ -105,7 +112,7 @@ func_args: func_arg
     | func_args COMMA func_arg
     ;
 
-func_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
+fn_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
     | FN LEFT_PAREN RIGHT_PAREN RET_SYMB all_type
     | FN LEFT_PAREN func_args RIGHT_PAREN
     | FN LEFT_PAREN RIGHT_PAREN
@@ -225,6 +232,17 @@ suffix_expr:
 	;
 ```
 
+**UnaryExpr**
+```yacc
+unary_expr: MUL expr
+	| BitwiseAND expr
+    | ADD expr %prec UMINUS
+    | SUB expr %prec UMIUNS
+    | NOT expr
+    | BitwiseNOT expr
+	;
+```
+
 **BinaryExpr**
 ```yacc
 binary_expr: expr GTE expr
@@ -243,17 +261,6 @@ binary_expr: expr GTE expr
     | expr MUL expr
     | expr DIV expr
     | expr MOD expr
-```
-
-**UnaryExpr**
-```yacc
-unary_expr: MUL expr
-	| BitwiseAND expr
-    | ADD expr %prec UMINUS
-    | SUB expr %prec UMIUNS
-    | NOT expr
-    | BitwiseNOT expr
-	;
 ```
 
 ## Stmt
