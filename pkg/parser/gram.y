@@ -77,7 +77,7 @@ NIL NULL IF ELIF ELSE
 	basic_type
 	all_type
 	array_type
-	ptr_type
+	pointer_type
 	unary_expr
 	/* conv_expr */
 	func_args_start
@@ -190,7 +190,8 @@ expr: identifier
 	| paren_expr
 	| suffix_expr
 	| unary_expr 
-	| binary_expr ;
+	| binary_expr
+	;
 
 
 // ------------------------------------------------------------------------------------------
@@ -279,9 +280,9 @@ return_stmt: RETURN
 	;
 
 
-decl_stmt: struct_decl
+decl_stmt: fn_decl
 	| value_decl
-	| fn_decl
+	| struct_decl
 	;
 
 value_stmt: expr
@@ -383,16 +384,15 @@ all_type: basic_type
 	| array_type
 	| map_type
 	| identifier
-	| ptr_type
+	| pointer_type
 	| fn_type
 	| LEFT_PAREN all_type RIGHT_PAREN
 		{ $$ = &ast.Node{} }
 	;
 
-ptr_type: MUL all_type
+pointer_type: MUL all_type
 		{ $$ = &ast.Node{} }
 	;
-
 
 basic_type: INT 
 		{ $$ = &ast.Node{} }
@@ -405,7 +405,6 @@ basic_type: INT
 	| ANY
     	{ $$ = &ast.Node{} }
 	;
-
 
 array_type: LEFT_BRACKET EQ RIGHT_BRACKET all_type
 		{ $$ = &ast.Node{} }
@@ -442,22 +441,21 @@ basic_literal: NUMBER
 		{ $$ = &ast.Node{} }
     ;
 
-array_literal: array_literal_start RIGHT_BRACKET
-		{ $$ = &ast.Node{} }
-	| LEFT_BRACKET RIGHT_BRACKET
+array_literal: LEFT_BRACKET RIGHT_BRACKET
 		{ $$ = &ast.Node{} }
 	| array_type LEFT_BRACKET RIGHT_BRACKET
 		{ $$ = &ast.Node{} }
+    | array_literal_start RIGHT_BRACKET
+		{ $$ = &ast.Node{} }
 	;
 
-array_literal_start: array_elem_start
-		{ $$ = &ast.Node{} }
-	| array_elem_start expr
-		{ $$ = &ast.Node{} }
-	|  LEFT_BRACKET expr
+array_literal_start: LEFT_BRACKET expr
 		{ $$ = &ast.Node{} }
 	| array_type LEFT_BRACKET expr
 		{ $$ = &ast.Node{} }
+    | array_elem_start expr
+		{ $$ = &ast.Node{} }
+    | array_elem_start
 	;
 
 array_elem_start :  LEFT_BRACKET expr COMMA
@@ -502,29 +500,6 @@ paren_expr: LEFT_PAREN expr RIGHT_PAREN
 	;
 
 
-
-call_arg: identifier
-		{ $$ = &ast.Node{} }
-    | identifier EQ expr
-		{ $$ = &ast.Node{} }
-    ;
-
-call_args_start: call_arg COMMA
-		{ $$ = &ast.Node{} }
-    | call_args_start call_arg COMMA
-		{ $$ = &ast.Node{} }
-	;
-
-call_args: call_args_start
-    | call_args_start call_arg
-	| call_arg
-	;
-
-expr_or_empty: expr
-	| 
-		{ $$ = nil }
-	;
-
 // index_expr, attr_expr, call_expr, slice_expr
 suffix_expr: 
 	// index
@@ -563,11 +538,33 @@ suffix_expr:
 	| suffix_expr LEFT_PAREN RIGHT_PAREN
 		{ $$ = &ast.Node{} }
 
-	// +slice
+	// + slice
 	| suffix_expr LEFT_BRACKET expr COLON expr RIGHT_BRACKET
 		{ $$ = &ast.Node{} }
 	| suffix_expr LEFT_BRACKET expr COLON expr COLON expr RIGHT_BRACKET
 		{ $$ = &ast.Node{} }
+	;
+
+call_arg: identifier
+		{ $$ = &ast.Node{} }
+    | identifier EQ expr
+		{ $$ = &ast.Node{} }
+    ;
+
+call_args_start: call_arg COMMA
+		{ $$ = &ast.Node{} }
+    | call_args_start call_arg COMMA
+		{ $$ = &ast.Node{} }
+	;
+
+call_args: call_args_start
+    | call_args_start call_arg
+	| call_arg
+	;
+
+expr_or_empty: expr
+	| 
+		{ $$ = nil }
 	;
 
 
@@ -618,6 +615,5 @@ binary_expr	: expr GTE expr
 	| expr MOD expr
 		{ $$ = &ast.Node{} }
 	;
-
 
 %%
