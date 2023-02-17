@@ -63,6 +63,7 @@ NIL NULL IF ELIF ELSE
 	stmt_block_with_empty
 	empty_block
 	stmt_block
+	stmt_block_start
 
 %type<aststmts>
 	stmts
@@ -118,10 +119,10 @@ NIL NULL IF ELIF ELSE
 	nil_literal
 	number_literal
 	value_stmt
-	struct_type_decl_start
-	struct_type_decl_stmt
+	struct_decl_start
+	struct_decl
 	fn_decl_start
-	fn_decl_stmt
+	fn_decl
 	decl_stmt
 	//columnref
 
@@ -191,9 +192,9 @@ stmt: ifelse_stmt
 	| decl_stmt
 	;
 
-decl_stmt: struct_type_decl_stmt
+decl_stmt: struct_decl
 	| value_decl_stmt
-	| fn_decl_stmt
+	| fn_decl
 	;
 
 value_stmt: expr
@@ -219,57 +220,41 @@ ptr_type: MUL all_type
 
 
 basic_type: INT 
-		{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
+		{ $$ = &ast.Node{} }
 	| FLOAT
-    	{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
+    	{ $$ = &ast.Node{} }
 	| BOOL
-    	{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
+    	{ $$ = &ast.Node{} }
 	| STR
-	   	{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
+	   	{ $$ = &ast.Node{} }
 	| ANY
-    	{
-			$$ = yylex.(*parser).newNamedType($1.Val, 0)
-		}
+    	{ $$ = &ast.Node{} }
 	;
 
 
 array_type: LEFT_BRACKET EQ RIGHT_BRACKET all_type
-		{	
-			$$ = yylex.(*parser).newListType($4)
-		}
+		{ $$ = &ast.Node{} }
 	| LEFT_BRACKET EQ number_literal RIGHT_BRACKET all_type
-		{
-			$$ = yylex.(*parser).newListType($5)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 map_type : MAP LEFT_BRACKET all_type RIGHT_BRACKET all_type
-		{	
-			$$ = yylex.(*parser).newMapType($3, $5)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 func_arg: identifier
-		{ $$ = $1 }
+		{ $$ = &ast.Node{} }
     | identifier EQ expr
-		{ $$ = $1 }
+		{ $$ = &ast.Node{} }
     | identifier COLON all_type
-		{ $$ = $1 }
+		{ $$ = &ast.Node{} }
     | identifier COLON all_type EQ expr
-		{ $$ = $1 }
+		{ $$ = &ast.Node{} }
     ;
 
 func_args: func_arg
     | func_args COMMA func_arg
-		{ $$ = $1 }
+		{ $$ = &ast.Node{} }
 
 func_type: FN LEFT_PAREN func_args RIGHT_PAREN RET_SYMB all_type
 		{ $$ = &ast.Node{} }
@@ -295,26 +280,26 @@ expr	: bool_literal
 	; */
 
 unary_expr: MUL expr %prec UMINUS 
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	| BitwiseAND expr %prec UMINUS 
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	| ADD expr %prec UMINUS 
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	| SUB expr %prec UMINUS 
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	| NOT expr
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	| BitwiseNOT expr
-		{ $$ = $2 }
+		{ $$ = &ast.Node{} }
 	;
 
 break_stmt: BREAK
-			{ $$ = yylex.(*parser).newBreakStmt($1.Pos) }
-		;
+		{ $$ = &ast.Node{} }
+	;
 
 continue_stmt: CONTINUE
-			{ $$ = yylex.(*parser).newContinueStmt($1.Pos) }
-		;
+		{ $$ = &ast.Node{} }
+	;
 
 return_stmt: RETURN
 		{ $$ = &ast.Node{} }
@@ -326,8 +311,8 @@ return_stmt: RETURN
 	for identifier IN string
 */
 for_in_stmt : FOR identifier IN expr stmt_block_with_empty
-			{ $$ = yylex.(*parser).newForInStmt($2, $4, $5, $1, $3) }
-		;
+		{ $$ = &ast.Node{} }
+	;
 
 
 /*
@@ -353,27 +338,23 @@ for_stmt : FOR expr SEMICOLON expr SEMICOLON expr stmt_block_with_empty
 	;
 
 ifelse_stmt: if_elif_list
-		{
-			$$ = yylex.(*parser).newIfElifStmt($1)
-		}
+		{ $$ = &ast.Node{} }
 	| if_elif_list ELSE stmt_block_with_empty
-		{
-			$$ = yylex.(*parser).newIfElifelseStmt($1, $2, $3)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 if_elem: IF expr stmt_block_with_empty
-	{ $$ = yylex.(*parser).newIfElem($1, $2, $3) } 
+		{ $$ = &ast.Node{} }
 	;
 
 if_elif_list: if_elem
-		{ $$ = []*plast.IfStmtElem{ $1 } }
+		{ $$ = &ast.Node{} }
 	| if_elif_list elif_elem
-		{ $$ = append($1, $2) }
+		{ $$ = &ast.Node{} }
 	;
 
 elif_elem: ELIF expr stmt_block_with_empty
-		{ $$ = yylex.(*parser).newIfElem($1, $2, $3) }
+		{ $$ = &ast.Node{} }
 	;
 
 
@@ -381,118 +362,98 @@ stmt_block_with_empty	: empty_block
 	| stmt_block
 	;
 
-stmt_block: LEFT_BRACE stmts RIGHT_BRACE
-		{ $$ = yylex.(*parser).newBlockStmt($1, $2, $3) }
+stmt_block: stmt_block_start RIGHT_BRACE
+		{ $$ = &ast.Node{} }
 	;
 
-empty_block : LEFT_BRACE RIGHT_BRACE
-		{ $$ = yylex.(*parser).newBlockStmt($1, plast.Stmts{} , $2) }
+stmt_block_start: LEFT_BRACE stmt sep
+		{ $$ = &ast.Node{} }
+	| stmt_block_start stmt sep
+		{ $$ = &ast.Node{} }
+	;
+
+empty_block: LEFT_BRACE RIGHT_BRACE
+		{ $$ = &ast.Node{} }
 	;
 
 
-func_call_args	: func_call_args COMMA expr
-			{
-			$$ = append($$, $3)
-			}
-		| func_call_args COMMA
-		| expr
-			{ $$ = []*plast.Node{$1} }
-		| identifier EQ expr
-			{ $$ = []*plast.Node{$1} }
-		;
+func_call_args: func_call_args COMMA expr
+		{ $$ = &ast.Node{} }
+	| func_call_args COMMA
+		{ $$ = &ast.Node{} }
+	| expr
+		{ $$ = &ast.Node{} }
+	| identifier EQ expr
+		{ $$ = &ast.Node{} }
+	;
 
 
 varb_or_const: LET | CONST
 	;
 
 value_decl_stmt: varb_or_const identifier
-		{ 
-			$$ = yylex.(*parser).newVarbDeclStmt($1) 
-			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, nil) 
-		}	
+		{ $$ = &ast.Node{} }
 	| varb_or_const identifier EQ expr
-		{ 
-			$$ = yylex.(*parser).newVarbDeclStmt($1) 
-			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, $4) 
-		}	
+		{ $$ = &ast.Node{} }
 	| varb_or_const identifier COLON all_type
-		{ 
-			$$ = yylex.(*parser).newVarbDeclStmt($1) 
-			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, nil) 
-		}	
+		{ $$ = &ast.Node{} }
 	| varb_or_const identifier COLON all_type EQ expr
-		{ 
-			$$ = yylex.(*parser).newVarbDeclStmt($1) 
-			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, $6) 
-		}	
+		{ $$ = &ast.Node{} }
 	| value_decl_stmt COMMA identifier
-		{
-			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, nil) 
-		}
+		{ $$ = &ast.Node{} }
 	| value_decl_stmt COMMA identifier EQ expr
-		{
-			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, $5) 
-		}
+		{ $$ = &ast.Node{} }
 	| value_decl_stmt COMMA identifier COLON all_type
-		{
-			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, nil) 
-		}
+		{ $$ = &ast.Node{} }
 	| value_decl_stmt COMMA identifier COLON all_type EQ expr
-		{
-			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, $7) 
-		}
+		{ $$ = &ast.Node{} }
 	;
 
-/* assignment_stmt: suffix_expr EQ expr
-        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
-	| identifier EQ expr
-		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
-	; */
 
 assignment_stmt: expr EQ expr
-        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
+        { $$ = &ast.Node{} }
 	;
 
 binary_expr	: expr GTE expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr GT expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr OR expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr AND expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr LT expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr LTE expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr NEQ expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr EQEQ expr
-				{ $$ = yylex.(*parser).newConditionalExpr($1, $3, $2) }
-			| expr BitwiseAND expr
-				{ $$ = $1 }
-			| expr BitwiseXOR expr
-				{ $$ = $1 }
-			| expr BitwiseOR expr
-				{ $$ = $1 }
-			| expr ADD expr
-				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
-			| expr SUB expr
-				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
-			| expr MUL expr
-				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
-			| expr DIV expr
-				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
-			| expr MOD expr
-				{ $$ = yylex.(*parser).newArithmeticExpr($1, $3, $2) }
-			;
+		{ $$ = &ast.Node{} }
+	| expr GT expr
+		{ $$ = &ast.Node{} }
+	| expr OR expr
+		{ $$ = &ast.Node{} }
+	| expr AND expr
+		{ $$ = &ast.Node{} }
+	| expr LT expr
+		{ $$ = &ast.Node{} }
+	| expr LTE expr
+		{ $$ = &ast.Node{} }
+	| expr NEQ expr
+		{ $$ = &ast.Node{} }
+	| expr EQEQ expr
+		{ $$ = &ast.Node{} }
+	| expr BitwiseAND expr
+		{ $$ = &ast.Node{} }
+	| expr BitwiseXOR expr
+		{ $$ = &ast.Node{} }
+	| expr BitwiseOR expr
+		{ $$ = &ast.Node{} }
+	| expr ADD expr
+		{ $$ = &ast.Node{} }
+	| expr SUB expr
+		{ $$ = &ast.Node{} }
+	| expr MUL expr
+		{ $$ = &ast.Node{} }
+	| expr DIV expr
+		{ $$ = &ast.Node{} }
+	| expr MOD expr
+		{ $$ = &ast.Node{} }
+	;
 
 // TODO: 支持多个表达式构成的括号表达式
 paren_expr: LEFT_PAREN expr RIGHT_PAREN
-			{ $$ = yylex.(*parser).newParenExpr($1, $2, $3) }
-		| LEFT_PAREN expr EOLS RIGHT_PAREN
-			{ $$ = yylex.(*parser).newParenExpr($1, $2, $4) }
-		;
+		{ $$ = &ast.Node{} }
+	| LEFT_PAREN expr EOLS RIGHT_PAREN
+		{ $$ = &ast.Node{} }
+	;
 
 
 EOLS: EOL
@@ -551,285 +512,156 @@ expr_or_empty: expr
 	;
 
 array_literal: array_init_start EOLS RIGHT_BRACKET
-		{
-			$$ = yylex.(*parser).newListInitEndExpr($$, $3.Pos)
-		}
+		{ $$ = &ast.Node{} }
 	| array_init_start RIGHT_BRACKET
-		{
-			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-		}
+		{ $$ = &ast.Node{} }
 	| array_init_start COMMA RIGHT_BRACKET
-		{
-			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-		}
+		{ $$ = &ast.Node{} }
 	| LEFT_BRACKET RIGHT_BRACKET
-		{ 
-			$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
-			$$ = yylex.(*parser).newListInitEndExpr($$, $2.Pos)
-		}
+		{ $$ = &ast.Node{} }
 	| array_type LEFT_BRACKET RIGHT_BRACKET
-		{ 
-			$$ = yylex.(*parser).newListInitStartExpr($2.Pos, nil)
-			$$ = yylex.(*parser).newListInitEndExpr($$, $3.Pos)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 array_init_start :  LEFT_BRACKET expr
-		{ 
-			$$ = yylex.(*parser).newListInitStartExpr($1.Pos, nil)
-			$$ = yylex.(*parser).newListInitAppendExpr($$, $2)
-		}
+		{ $$ = &ast.Node{} }
 	| array_type LEFT_BRACKET expr
-		{ 
-			$$ = yylex.(*parser).newListInitStartExpr($2.Pos, $1)
-			$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-		}
+		{ $$ = &ast.Node{} }
 	| array_init_start COMMA expr
-		{				
-			$$ = yylex.(*parser).newListInitAppendExpr($$, $3)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 key_value_expr: expr COLON expr
 	;
 
 composite_literal : composite_literal_start RIGHT_BRACE
-			{
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.Pos)
-			}
-		| composite_literal_start expr RIGHT_BRACE
-			{
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $3.Pos)
-			}
-		| composite_literal_start key_value_expr RIGHT_BRACE
-			{
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $3.Pos)
-			}
-		| empty_block
-			{ 
-				$$ = yylex.(*parser).newMapInitStartExpr($1.LBracePos.Pos, nil)
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $1.RBracePos.Pos)
-			}
-		| map_type empty_block
-			{ 
-				$$ = yylex.(*parser).newMapInitStartExpr($2.LBracePos.Pos, $1)
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.RBracePos.Pos)
-			}
-		| identifier empty_block
-			{ 
-				$$ = yylex.(*parser).newMapInitStartExpr($2.LBracePos.Pos, $1)
-				$$ = yylex.(*parser).newMapInitEndExpr($$, $2.RBracePos.Pos)
-			}
-		;
+		{ $$ = &ast.Node{} }
+	| composite_literal_start expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| composite_literal_start key_value_expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| empty_block
+		{ $$ = &ast.Node{} }
+	| map_type empty_block
+		{ $$ = &ast.Node{} }
+	| identifier empty_block
+		{ $$ = &ast.Node{} }
+	| LEFT_BRACE expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| LEFT_BRACE key_value_expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_BRACE key_value_expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| identifier LEFT_BRACE expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| map_type LEFT_BRACE expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| map_type LEFT_BRACE key_value_expr RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	;
 
 composite_literal_start: LEFT_BRACE key_value_expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
-		}
+		{ $$ = &ast.Node{} }
 	| LEFT_BRACE expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
-		}
+		{ $$ = &ast.Node{} }
 	| map_type LEFT_BRACE key_value_expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
-		}
+		{ $$ = &ast.Node{} }
 	| map_type LEFT_BRACE expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
-		} 
+		{ $$ = &ast.Node{} }
 	| identifier LEFT_BRACE key_value_expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($1.Pos, nil)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $2, $4)
-		}
+		{ $$ = &ast.Node{} }
 	| identifier LEFT_BRACE expr COMMA
-		{ 
-			$$ = yylex.(*parser).newMapInitStartExpr($2.Pos, $1)
-			// $$ = yylex.(*parser).newMapInitAppendExpr($$, $3, $5)
-		} 
+		{ $$ = &ast.Node{} }
 	| composite_literal_start  key_value_expr  COMMA
-		{
-			$$ = yylex.(*parser).newMapInitAppendExpr($1, nil, nil)
-		}
+		{ $$ = &ast.Node{} }
 	| composite_literal_start expr  COMMA
-		{
-			$$ = yylex.(*parser).newMapInitAppendExpr($1, nil, nil)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
 
-/* array_elem	: bool_literal
-		| string_literal
-		| nil_literal
-		| number_literal
-		| identifier
-		; */
-
-/*
-	literal:
-		bool
-		number (int float)
-		nil
-*/
 bool_literal	: TRUE
-			{ $$ = yylex.(*parser).newBoolLiteral($1.Pos, true) }
-		| FALSE
-			{ $$ =  yylex.(*parser).newBoolLiteral($1.Pos, false) }
-		;
+		{ $$ = &ast.Node{} }
+	| FALSE
+		{ $$ = &ast.Node{} }
+	;
 
 
 string_literal	: STRING
-			{ 
-				$1.Val = yylex.(*parser).unquoteString($1.Val)
-				$$ = yylex.(*parser).newStringLiteral($1) 
-			}
-		| MULTILINE_STRING
-			{
-				$1.Val = yylex.(*parser).unquoteMultilineString($1.Val)
-				$$ = yylex.(*parser).newStringLiteral($1)
-			}
-		;
+		{ $$ = &ast.Node{} }
+	| MULTILINE_STRING
+		{ $$ = &ast.Node{} }
+	;
 
 
 nil_literal	: NIL
-			{ $$ = yylex.(*parser).newNilLiteral($1.Pos) }
-		| NULL
-			{ $$ = yylex.(*parser).newNilLiteral($1.Pos) }
-		;
+		{ $$ = &ast.Node{} }
+	| NULL
+		{ $$ = &ast.Node{} }
+	;
 
 
 
 number_literal	: NUMBER
-			{ $$ =  yylex.(*parser).newNumberLiteral($1) }
-		/* | unary_op NUMBER
-			{
-			num :=  yylex.(*parser).newNumberLiteral($2) 
-			switch $1.Typ {
-			case ADD: // pass
-			case SUB:
-				if num.NodeType == plast.TypeFloatLiteral {
-					num.FloatLiteral.Val = -num.FloatLiteral.Val
-					num.FloatLiteral.Start = yylex.(*parser).posCache.LnCol($1.Pos)
-				} else {
-					num.IntegerLiteral.Val = -num.IntegerLiteral.Val
-					num.IntegerLiteral.Start = yylex.(*parser).posCache.LnCol($1.Pos)
+		{ $$ = &ast.Node{} }
+	;
 
-				}
-			}
-			$$ = num
-			} */
-		;
-
-identifier: ID
-			{
-				$$ = yylex.(*parser).newIdentifier($1)
-			}
-		| QUOTED_STRING
-			{
-				$1.Val = yylex.(*parser).unquoteString($1.Val) 
-				$$ = yylex.(*parser).newIdentifier($1)
-			}
-		;
+identifier: QUOTED_STRING
+		{ $$ = &ast.Node{} }
+	;
 
 
 /* unary_op	: ADD | SUB ; */
 
-struct_type_decl_start : STRUCT identifier LEFT_BRACE identifier
-		{
-			$$ = yylex.(*parser).newStructTypeDecl($2)
-			$$ = yylex.(*parser).structTypeAppendField($$, $4, nil)
-		}
-	| STRUCT identifier LEFT_BRACE identifier COLON all_type
-		{
-			$$ = yylex.(*parser).newStructTypeDecl($2)
-			$$ = yylex.(*parser).structTypeAppendField($$, $4, $6)
-		}
-	| struct_type_decl_start COMMA identifier
-		{
-			$$ = yylex.(*parser).structTypeAppendField($$, $3, nil)
-		}
-	| struct_type_decl_start COMMA identifier COLON all_type
-		{
-			$$ = yylex.(*parser).structTypeAppendField($$, $3, $5)
-		}
-	| struct_type_decl_start EOL
+struct_decl_start : STRUCT identifier LEFT_BRACE identifier COMMA
+		{ $$ = &ast.Node{} }
+	| STRUCT identifier LEFT_BRACE identifier COLON all_type COMMA
+		{ $$ = &ast.Node{} }
+	| struct_decl_start identifier COMMA
+		{ $$ = &ast.Node{} }
+	| struct_decl_start identifier COLON all_type COMMA
+		{ $$ = &ast.Node{} }
 	;
 
 
-struct_type_decl_stmt: struct_type_decl_start RIGHT_BRACE
-		{
-			$$ = $1
-		}
-	| struct_type_decl_start COMMA RIGHT_BRACE
-		{
-			$$ = $1
-		}
+struct_decl: struct_decl_start RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| struct_decl_start identifier RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| struct_decl_start identifier COLON all_type RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| STRUCT identifier LEFT_BRACE identifier RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| STRUCT identifier LEFT_BRACE identifier COLON all_type RIGHT_BRACE
+		{ $$ = &ast.Node{} }
 	| STRUCT identifier empty_block
-		{
-			$$ = yylex.(*parser).newStructTypeDecl($2)
-		}
+		{ $$ = &ast.Node{} }
 	;
 
-fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
-		{
-			$$ = yylex.(*parser).fnDeclAppenReturn($1, $4)
-			$$ = yylex.(*parser).fnDeclEnd($$, $5)
-		}
-	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
-		{
-			$$ = yylex.(*parser).fnDeclAppenReturn($1, $5)
-			$$ = yylex.(*parser).fnDeclEnd($$, $6)
-		}
-	| fn_decl_start RIGHT_PAREN RET_SYMB stmt_block_with_empty
-		{
-			$$ = yylex.(*parser).fnDeclEnd($$, $4)
-		}
-	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB stmt_block_with_empty
-		{
-			$$ = yylex.(*parser).fnDeclEnd($$, $5)
-		}
+fn_decl: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| fn_decl_start EOLS RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| fn_decl_start RIGHT_PAREN stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| fn_decl_start EOLS RIGHT_PAREN stmt_block_with_empty
+		{ $$ = &ast.Node{} }
 	;
 
 fn_decl_start: FN identifier LEFT_PAREN identifier
-		{
-			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil, nil)
-		}
+		{ $$ = &ast.Node{} }
 	| FN identifier LEFT_PAREN identifier COLON all_type
-		{
-			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6, nil)
-		}
+		{ $$ = &ast.Node{} }
 	| fn_decl_start COMMA identifier
-		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil, nil)
-		}
+		{ $$ = &ast.Node{} }
 	| fn_decl_start COMMA identifier COLON all_type
-		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5, nil)
-		}
+		{ $$ = &ast.Node{} }
 	| FN identifier LEFT_PAREN identifier EQ expr
-		{
-			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, nil, $6)
-		}
+		{ $$ = &ast.Node{} }
 	| FN identifier LEFT_PAREN identifier COLON all_type EQ expr
-		{
-			$$ = yylex.(*parser).newFnDecl($2)
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $4, $6, $8)
-		}
+		{ $$ = &ast.Node{} }
 	| fn_decl_start COMMA identifier EQ expr
-		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, nil, $5)
-		}
+		{ $$ = &ast.Node{} }
 	| fn_decl_start COMMA identifier COLON all_type EQ expr
-		{
-			$$ = yylex.(*parser).fnDeclAppenParam($$, $3, $5, $7)
-		}
+		{ $$ = &ast.Node{} }
 	;
 %%

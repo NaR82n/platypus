@@ -76,6 +76,13 @@ func (c *PosCache) LnCol(pos Pos) LnColPos {
 		return InvalidLnColPos
 	}
 
+	{
+		a := 1
+		a = a + 1
+		fmt.Print(a)
+
+	}
+
 	return LnColPos{
 		Pos: pos,
 		Ln:  int(ln) + 1,

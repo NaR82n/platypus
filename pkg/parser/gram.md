@@ -145,18 +145,33 @@ key_value_expr: expr COLON expr
 
 composite_literal: composite_literal_start RIGHT_BRACE
     | composite_literal_start expr RIGHT_BRACE
-    | composite_literal_start RIGHT_BRACE
+    | composite_literal_start key_value_expr RIGHT_BRACE
+
     | empty_block
+
     | map_type empty_block
+
     | identifier empty_block
+
+    | LEFT_BRACE expr RIGHT_BRACE
+    | LEFT_BRACE key_value_expr RIGHT_BRACE
+
+    | identifier LEFT_BRACE key_value_expr RIGHT_BRACE
+    | identifier LEFT_BRACE expr RIGHT_BRACE
+
+    | map_type LEFT_BRACE expr RIGHT_BRACE
+    | map_type LEFT_BRACE key_value_expr RIGHT_BRACE
     ;
 
 composite_literal_start: LEFT_BRACE key_value_expr COMMA
     | LEFT_BRACE expr COMMA
+
     | map_type LEFT_BRACE key_value_expr COMMA
     | map_type LEF_BRACE expr COMMA
+
     | identifier LEFT_BRACE key_value_expr COMMA
     | identifer LEFT_BRACE expr COMMA
+
     | composite_literal_start key_value_expr COMMA
     | composite_literal_start expr COMMA
     ;
@@ -351,7 +366,11 @@ elif_elem: ELIF expr stmt_block_with_empty
 
 **BlockStmt**
 ```yacc
-stmt_block: LEFT_BRACE stmts RIGHT_BRACE
+stmt_block: stmt_block_start RIGHT_BRACE
+	;
+
+stmt_block_start: LEFT_BRACE stmt sep
+	| stmt_block_start stmt sep
 	;
 ```
 
@@ -370,23 +389,23 @@ decl_stmt: value_decl
 varb_or_const: LET | CONST
 	;
 
-value_decl_stmt: varb_or_const identifier
+value_decl: varb_or_const identifier
 	| varb_or_const identifier EQ expr
 	| varb_or_const identifier COLON all_type
 	| varb_or_const identifier COLON all_type EQ expr
-	| value_decl_stmt COMMA identifier
-	| value_decl_stmt COMMA identifier EQ expr
-	| value_decl_stmt COMMA identifier COLON all_type
-	| value_decl_stmt COMMA identifier COLON all_type EQ expr
+	| value_decl COMMA identifier
+	| value_decl COMMA identifier EQ expr
+	| value_decl COMMA identifier COLON all_type
+	| value_decl COMMA identifier COLON all_type EQ expr
 	;
 ```
 
 **FuncDecl**
 ```yacc
-fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with empty
-	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
-	| fn_decl_start RIGHT_PAREN RET_SYMB stmt_block_with_empty
-	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB stmt_block_with_empty
+fn_decl: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
+	| fn_decl_start EOLS RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
+	| fn_decl_start RIGHT_PAREN stmt_block_with_empty
+	| fn_decl_start EOLS RIGHT_PAREN stmt_block_with_empty
     ;
 
 fn_decl_start: FN identifier LEFT_PAREN identifier
@@ -398,4 +417,22 @@ fn_decl_start: FN identifier LEFT_PAREN identifier
 	| fn_decl_start COMMA identifier EQ expr
 	| fn_decl_start COMMA identifier COLON all_type EQ expr
     ;
+```
+
+**StructDecl**
+```yacc
+struct_decl: struct_decl_start RIGHT_BRACE
+	| struct_decl_start identifier RIGHT_BRACE
+	| struct_decl_start identifier COLON all_type RIGHT_BRACE
+	| STRUCT identifier LEFT_BRACE identifier RIGHT_BRACE
+	| STRUCT identifier LEFT_BRACE identifier COLON all_type RIGHT_BRACE
+	| STRUCT identifier empty_block
+	;
+
+struct_decl_start : STRUCT identifier LEFT_BRACE identifier COMMA
+	| STRUCT identifier LEFT_BRACE identifier COLON all_type COMMA
+	| struct_decl_start identifier COMMA
+	| struct_decl_start identifier COLON all_type COMMA
+	;
+
 ```
