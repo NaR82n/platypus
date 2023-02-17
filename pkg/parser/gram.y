@@ -93,8 +93,11 @@ NIL NULL IF ELIF ELSE
 	suffix_expr
 	fn_type
 	composite_literal
-	key_value_expr
-	composite_literal_start
+	composite_elem
+	composite_elems
+	composite_elems_start
+	/* key_value_expr
+	composite_literal_start */
 	array_literal
 	array_literal_start
 	basic_literal
@@ -465,53 +468,33 @@ array_elem_start :  LEFT_BRACKET expr COMMA
 		{ $$ = &ast.Node{} }
 	;
 
-key_value_expr: expr COLON expr
+composite_literal: LEFT_BRACE composite_elems RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| map_type LEFT_BRACE composite_elems RIGHT_BRACE
+	| identifier LEFT_BRACE composite_elems RIGHT_BRACE
+	| LEFT_BRACE RIGHT_BRACE
+		{ $$ = &ast.Node{} }
+	| map_type LEFT_BRACE RIGHT_BRACE
+	| identifier LEFT_BRACE RIGHT_BRACE
 	;
 
-composite_literal : composite_literal_start RIGHT_BRACE
+composite_elem: expr COLON expr
 		{ $$ = &ast.Node{} }
-	| composite_literal_start expr RIGHT_BRACE
+	| expr
+	;
+
+composite_elems_start: composite_elem COMMA
 		{ $$ = &ast.Node{} }
-	| composite_literal_start key_value_expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| empty_block
-		{ $$ = &ast.Node{} }
-	| map_type empty_block
-		{ $$ = &ast.Node{} }
-	| identifier empty_block
-		{ $$ = &ast.Node{} }
-	| LEFT_BRACE expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| LEFT_BRACE key_value_expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| identifier LEFT_BRACE key_value_expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| identifier LEFT_BRACE expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| map_type LEFT_BRACE expr RIGHT_BRACE
-		{ $$ = &ast.Node{} }
-	| map_type LEFT_BRACE key_value_expr RIGHT_BRACE
+	| composite_elems_start composite_elem COMMA
 		{ $$ = &ast.Node{} }
 	;
 
-composite_literal_start: LEFT_BRACE key_value_expr COMMA
+composite_elems: composite_elems_start
 		{ $$ = &ast.Node{} }
-	| LEFT_BRACE expr COMMA
+	| composite_elems_start composite_elem
 		{ $$ = &ast.Node{} }
-	| map_type LEFT_BRACE key_value_expr COMMA
-		{ $$ = &ast.Node{} }
-	| map_type LEFT_BRACE expr COMMA
-		{ $$ = &ast.Node{} }
-	| identifier LEFT_BRACE key_value_expr COMMA
-		{ $$ = &ast.Node{} }
-	| identifier LEFT_BRACE expr COMMA
-		{ $$ = &ast.Node{} }
-	| composite_literal_start key_value_expr  COMMA
-		{ $$ = &ast.Node{} }
-	| composite_literal_start expr  COMMA
-		{ $$ = &ast.Node{} }
+	| composite_elem
 	;
-
 
 
 paren_expr: LEFT_PAREN expr RIGHT_PAREN
