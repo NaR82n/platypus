@@ -27,6 +27,7 @@
     "any":        ANY,
     "let":        LET,
     "fn":         FN,
+    "const":      CONST,
     "->":         RET_SYMB,
     "(":          LEFT_PAREN,
     ")":          RIGHT_PAREN,
@@ -51,7 +52,7 @@
     ">=":         GTE,
     ">":          GT,
     "&":          BitwiseAND,
-    "^":          XOR,
+    "^":           XOR,
     "&&":         AND,
     "||":         OR
 }
@@ -137,7 +138,7 @@ array_literal_start: LEFT_BRACKET expr
     ;
 ```
 
-**CompositeLiteral**
+**CompositeLiteral/KeyValueExpr**
 ```yacc
 key_value_expr: expr COLON expr
 	;
@@ -241,3 +242,160 @@ unary_expr: MUL expr
 ```
 
 ## Stmt
+
+**Stmt**
+```yacc
+sep : SEMICOLON
+	| EOL
+	| sep SEMICOLON
+	| sep EOL
+    ;
+
+stmt: ifelse_stmt
+	| for_in_stmt
+	| for_stmt
+	| continue_stmt
+	| break_stmt
+	| return_stmt
+	| value_stmt
+	| decl_stmt
+	| assignment_stmt
+	| stmt_block
+	;
+
+stmts_list: stmt sep
+	| sep
+	| stmts_list stmt sep
+	;
+
+stmts: stmts_list stmt
+	| stmts_list
+	| stmt
+	;
+```
+
+**ValueStmt**
+```yacc
+value_stmt: expr
+    ;
+```
+
+**AssignStmt**
+```yacc
+assignment_stmt: expr EQ expr
+    ;
+```
+
+**ReturnStmt**
+```yacc
+return_stmt: RETURN
+    ;
+```
+
+**BreakStmt**
+```yacc
+break_stmt: BREAK
+    ;
+```
+
+**ContinueStmt**
+```yacc
+continue_stmt: CONTINUE
+    ;
+```
+
+**ForInStmt**
+```
+stmt_block_with_empty: empty_block
+	| stmt_block
+	;
+
+fot_in_stmt: FOT identifier IN expr stmt_block_with_empty
+    ;
+```
+
+**ForStmt**
+```yacc
+/*
+	for <expr>; <expr>; <expr>  stmt_block_with_empty
+	111 (expr, expr, expr) -> 000 ( , , )
+*/
+for_stmt : FOR expr SEMICOLON expr SEMICOLON expr stmt_block_with_empty
+	| FOR expr SEMICOLON expr SEMICOLON stmt_block_with_empty
+	| FOR expr SEMICOLON SEMICOLON expr stmt_block_with_empty
+	| FOR expr SEMICOLON SEMICOLON stmt_block_with_empty
+	| FOR SEMICOLON expr SEMICOLON expr stmt_block_with_empty
+	| FOR SEMICOLON expr SEMICOLON stmt_block_with_empty
+	| FOR SEMICOLON SEMICOLON expr stmt_block_with_empty
+	| FOR SEMICOLON SEMICOLON stmt_block_with_empty
+	;
+```
+
+**IfStmt**
+```yacc
+if_stmt: if_flif_list
+    | if_elif_list ELSE stmt_block_with_empty
+    ;
+
+if_elif_list: if_elem
+    | if_elif_list elif_elem
+    ;
+
+if_elem: IF expr stmt_block_with_empty
+    ;
+
+elif_elem: ELIF expr stmt_block_with_empty
+    ;
+```
+
+
+**BlockStmt**
+```yacc
+stmt_block: LEFT_BRACE stmts RIGHT_BRACE
+	;
+```
+
+**DeclStmt**
+```yacc
+decl_stmt: value_decl
+    | struct_decl
+    | func_decl
+    ;
+```
+
+## Decl
+
+**ValueDecl**
+```yacc
+varb_or_const: LET | CONST
+	;
+
+value_decl_stmt: varb_or_const identifier
+	| varb_or_const identifier EQ expr
+	| varb_or_const identifier COLON all_type
+	| varb_or_const identifier COLON all_type EQ expr
+	| value_decl_stmt COMMA identifier
+	| value_decl_stmt COMMA identifier EQ expr
+	| value_decl_stmt COMMA identifier COLON all_type
+	| value_decl_stmt COMMA identifier COLON all_type EQ expr
+	;
+```
+
+**FuncDecl**
+```yacc
+fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with empty
+	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
+	| fn_decl_start RIGHT_PAREN RET_SYMB stmt_block_with_empty
+	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB stmt_block_with_empty
+    ;
+
+fn_decl_start: FN identifier LEFT_PAREN identifier
+	| FN identifier LEFT_PAREN identifier COLON all_type
+	| FN identifier LEFT_PAREN identifier EQ expr
+	| FN identifier LEFT_PAREN identifier COLON all_type EQ expr
+    | fn_decl_start COMMA identifier
+	| fn_decl_start COMMA identifier COLON all_type
+	| fn_decl_start COMMA identifier EQ expr
+	| fn_decl_start COMMA identifier COLON all_type EQ expr
+    ;
+```

@@ -110,6 +110,7 @@ var (
 		"struct":     STRUCT,
 		"any":        ANY,
 		"let":        LET,
+		"const":      CONST,
 		"fn":         FN,
 	}
 

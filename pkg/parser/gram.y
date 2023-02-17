@@ -30,7 +30,7 @@ import (
 	RIGHT_PAREN RIGHT_BRACKET SPACE STRING QUOTED_STRING MULTILINE_STRING
 	FOR IN WHILE BREAK CONTINUE	RETURN EOL COLON
 	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB NOT
-	BitwiseXOR BitwiseOR BitwiseNOT BitwiseAND
+	BitwiseXOR BitwiseOR BitwiseNOT BitwiseAND CONST
 
 // operator
 %token operatorsStart
@@ -55,14 +55,14 @@ NIL NULL IF ELIF ELSE
 ////////////////////////////////////////////////////
 // grammar rules
 ////////////////////////////////////////////////////
-/* %type <item>
-	unary_op */
+%type <item>
+	varb_or_const
 
 
-%type<astblock>
-	stmt_block
+%type<node>
+	stmt_block_with_empty
 	empty_block
-
+	stmt_block
 
 %type<aststmts>
 	stmts
@@ -81,10 +81,11 @@ NIL NULL IF ELIF ELSE
 %type <node>
 	stmt
 	assignment_stmt
-	varb_decl_stmt
+	value_decl_stmt
 	for_in_stmt
 	for_stmt
 	continue_stmt
+	return_stmt
 	break_stmt
 	ifelse_stmt
 	expr
@@ -121,6 +122,7 @@ NIL NULL IF ELIF ELSE
 	struct_type_decl_stmt
 	fn_decl_start
 	fn_decl_stmt
+	decl_stmt
 	//columnref
 
 %start start
@@ -156,9 +158,9 @@ start	: START_STMTS stmts
 
 stmts: stmts_list stmt
 		{
-		s := $1
-		s = append(s, $2)
-		$$ = s
+			s := $1
+			s = append(s, $2)
+			$$ = s
 		}
 	| stmts_list
 	| stmt
@@ -182,13 +184,17 @@ stmt: ifelse_stmt
 	| for_stmt
 	| continue_stmt
 	| break_stmt
+	| return_stmt
 	| value_stmt
-	| struct_type_decl_stmt
-	| varb_decl_stmt
-	| fn_decl_stmt
 	| assignment_stmt
+	| stmt_block
+	| decl_stmt
 	;
 
+decl_stmt: struct_type_decl_stmt
+	| value_decl_stmt
+	| fn_decl_stmt
+	;
 
 value_stmt: expr
 	;
@@ -310,52 +316,53 @@ continue_stmt: CONTINUE
 			{ $$ = yylex.(*parser).newContinueStmt($1.Pos) }
 		;
 
+return_stmt: RETURN
+		{ $$ = &ast.Node{} }
+	;
+
 /*
 	for identifier IN identifier
 	for identifier IN list_init
 	for identifier IN string
 */
-for_in_stmt : FOR identifier IN expr stmt_block
+for_in_stmt : FOR identifier IN expr stmt_block_with_empty
 			{ $$ = yylex.(*parser).newForInStmt($2, $4, $5, $1, $3) }
 		;
 
 
 /*
-	for init expr; cond expr; loop expr  block_smt
-	for init expr; cond expr; 			 block_stmt
-	for 		 ; cond expr; loop expr  block_stmt
-	for 		 ; cond expr; 		     block_stmt
+	for <expr>; <expr>; <expr>  block_smt
+	111 (expr, expr, expr) -> 000 ( , , )
 */
-for_stmt : FOR expr SEMICOLON expr SEMICOLON expr stmt_block
-		{ $$ = yylex.(*parser).newForStmt($2, $4, $6, $7) }
-	| FOR expr SEMICOLON expr SEMICOLON stmt_block
-		{ $$ = yylex.(*parser).newForStmt($2, $4, nil, $6) }
-	| FOR SEMICOLON expr SEMICOLON expr stmt_block
-		{ $$ = yylex.(*parser).newForStmt(nil, $3, $5, $6) }
-	| FOR SEMICOLON expr SEMICOLON stmt_block
-		{ $$ = yylex.(*parser).newForStmt(nil, $3, nil, $5) }
-
-	| FOR expr SEMICOLON SEMICOLON expr stmt_block
-		{ $$ = yylex.(*parser).newForStmt($2, nil, $5, $6) }
-	| FOR expr SEMICOLON SEMICOLON stmt_block
-		{ $$ = yylex.(*parser).newForStmt($2, nil, nil, $5) }
-	| FOR SEMICOLON SEMICOLON expr stmt_block
-		{ $$ = yylex.(*parser).newForStmt(nil, nil, $4, $5) }
-	| FOR SEMICOLON SEMICOLON stmt_block
-		{ $$ = yylex.(*parser).newForStmt(nil, nil, nil, $4) }
+for_stmt : FOR expr SEMICOLON expr SEMICOLON expr stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR expr SEMICOLON expr SEMICOLON stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR expr SEMICOLON SEMICOLON expr stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR expr SEMICOLON SEMICOLON stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR SEMICOLON expr SEMICOLON expr stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR SEMICOLON expr SEMICOLON stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR SEMICOLON SEMICOLON expr stmt_block_with_empty
+		{ $$ = &ast.Node{} }
+	| FOR SEMICOLON SEMICOLON stmt_block_with_empty
+		{ $$ = &ast.Node{} }
 	;
 
 ifelse_stmt: if_elif_list
 		{
 			$$ = yylex.(*parser).newIfElifStmt($1)
 		}
-	| if_elif_list ELSE stmt_block
+	| if_elif_list ELSE stmt_block_with_empty
 		{
 			$$ = yylex.(*parser).newIfElifelseStmt($1, $2, $3)
 		}
 	;
 
-if_elem: IF expr stmt_block
+if_elem: IF expr stmt_block_with_empty
 	{ $$ = yylex.(*parser).newIfElem($1, $2, $3) } 
 	;
 
@@ -365,13 +372,16 @@ if_elif_list: if_elem
 		{ $$ = append($1, $2) }
 	;
 
-elif_elem: ELIF expr stmt_block
+elif_elem: ELIF expr stmt_block_with_empty
 		{ $$ = yylex.(*parser).newIfElem($1, $2, $3) }
 	;
 
 
-stmt_block	: empty_block
-	| LEFT_BRACE stmts RIGHT_BRACE
+stmt_block_with_empty	: empty_block
+	| stmt_block
+	;
+
+stmt_block: LEFT_BRACE stmts RIGHT_BRACE
 		{ $$ = yylex.(*parser).newBlockStmt($1, $2, $3) }
 	;
 
@@ -391,49 +401,56 @@ func_call_args	: func_call_args COMMA expr
 			{ $$ = []*plast.Node{$1} }
 		;
 
-varb_decl_stmt: LET identifier
+
+varb_or_const: LET | CONST
+	;
+
+value_decl_stmt: varb_or_const identifier
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
 			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, nil) 
 		}	
-	| LET identifier EQ expr
+	| varb_or_const identifier EQ expr
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
 			$$ = yylex.(*parser).varbDeclAppend($$, $2, nil, $4) 
 		}	
-	| LET identifier COLON all_type
+	| varb_or_const identifier COLON all_type
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
 			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, nil) 
 		}	
-	| LET identifier COLON all_type EQ expr
+	| varb_or_const identifier COLON all_type EQ expr
 		{ 
 			$$ = yylex.(*parser).newVarbDeclStmt($1) 
 			$$ = yylex.(*parser).varbDeclAppend($$, $2, $4, $6) 
 		}	
-	| varb_decl_stmt COMMA identifier
+	| value_decl_stmt COMMA identifier
 		{
 			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, nil) 
 		}
-	| varb_decl_stmt COMMA identifier EQ expr
+	| value_decl_stmt COMMA identifier EQ expr
 		{
 			$$ = yylex.(*parser).varbDeclAppend($$, $3, nil, $5) 
 		}
-	| varb_decl_stmt COMMA identifier COLON all_type
+	| value_decl_stmt COMMA identifier COLON all_type
 		{
 			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, nil) 
 		}
-	| varb_decl_stmt COMMA identifier COLON all_type EQ expr
+	| value_decl_stmt COMMA identifier COLON all_type EQ expr
 		{
 			$$ = yylex.(*parser).varbDeclAppend($$, $3, $5, $7) 
 		}
-
 	;
 
-assignment_stmt: suffix_expr EQ expr
+/* assignment_stmt: suffix_expr EQ expr
         { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
 	| identifier EQ expr
-		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
+		{ $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }
+	; */
+
+assignment_stmt: expr EQ expr
+        { $$ = yylex.(*parser).newAssignmentExpr($1, $3, $2) }	
 	;
 
 binary_expr	: expr GTE expr
@@ -758,23 +775,23 @@ struct_type_decl_stmt: struct_type_decl_start RIGHT_BRACE
 		}
 	;
 
-fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block
+fn_decl_stmt: fn_decl_start RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
 		{
 			$$ = yylex.(*parser).fnDeclAppenReturn($1, $4)
 			$$ = yylex.(*parser).fnDeclEnd($$, $5)
 		}
-	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block
+	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB all_type stmt_block_with_empty
 		{
 			$$ = yylex.(*parser).fnDeclAppenReturn($1, $5)
 			$$ = yylex.(*parser).fnDeclEnd($$, $6)
 		}
-	| fn_decl_start RIGHT_PAREN stmt_block
-		{
-			$$ = yylex.(*parser).fnDeclEnd($$, $3)
-		}
-	| fn_decl_start COMMA RIGHT_PAREN stmt_block
+	| fn_decl_start RIGHT_PAREN RET_SYMB stmt_block_with_empty
 		{
 			$$ = yylex.(*parser).fnDeclEnd($$, $4)
+		}
+	| fn_decl_start COMMA RIGHT_PAREN RET_SYMB stmt_block_with_empty
+		{
+			$$ = yylex.(*parser).fnDeclEnd($$, $5)
 		}
 	;
 
