@@ -112,6 +112,9 @@ var (
 		"let":        LET,
 		"const":      CONST,
 		"fn":         FN,
+		"try":        TRY,
+		"catch":      CATCH,
+		// "throw":      THROW,
 	}
 
 	ItemTypeStr = map[ItemType]string{
