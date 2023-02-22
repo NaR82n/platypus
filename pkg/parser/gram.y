@@ -26,8 +26,7 @@ import (
 	FOR IN WHILE BREAK CONTINUE	RETURN EOL COLON
 	STR INT FLOAT BOOL LIST MAP STRUCT ANY LET FN RET_SYMB NOT
 	BitwiseXOR BitwiseOR BitwiseNOT BitwiseAND CONST
-	TRY  CATCH 
-	/* THROW */
+	TRY CATCH THROW
 
 // operator
 %token operatorsStart
@@ -113,6 +112,7 @@ NIL NULL IF ELIF ELSE
 	fn_decl
 	value_decl_elem
 	decl_stmt
+	throw_stmt
 
 %type<aststmts>
 	stmts
@@ -183,6 +183,7 @@ stmt: ifelse_stmt
 	| stmt_block
 	| decl_stmt
 	| try_stmt
+	| throw_stmt
 	;
 
 /* expression */
@@ -302,6 +303,10 @@ try_stmt: TRY stmt_block_with_empty CATCH LEFT_PAREN identifier COLON all_type R
 		{ $$ = &ast.Node{} }
 	| try_stmt CATCH LEFT_PAREN identifier COLON all_type RIGHT_PAREN stmt_block_with_empty
 		{ $$ = &ast.Node{} }
+	;
+
+throw_stmt: THROW expr
+		{ $$ = &ast.NodeP{} }
 	;
 
 // ------------------------------------------------------------------------------------------

@@ -114,7 +114,7 @@ var (
 		"fn":         FN,
 		"try":        TRY,
 		"catch":      CATCH,
-		// "throw":      THROW,
+		"throw":      THROW,
 	}
 
 	ItemTypeStr = map[ItemType]string{

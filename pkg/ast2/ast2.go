@@ -8,21 +8,28 @@ type Node interface {
 }
 
 type Decl interface {
-	decl()
+	declNode()
 
 	Start() token.Token
 	End() token.Token
 }
 
 type Expr interface {
-	expr()
+	exprNode()
 
 	Start() token.Pos
 	End() token.Pos
 }
 
 type Stmt interface {
-	stmt()
+	stmtNode()
+
+	Start() token.Pos
+	End() token.Pos
+}
+
+type Type interface {
+	typeNode()
 
 	Start() token.Pos
 	End() token.Pos
@@ -53,38 +60,63 @@ type Identifier struct {
 }
 
 type BasicType struct {
-	// int, float, bool, str
-}
+	Kind  TypeKind
+	Value string
 
-type ArrayType struct {
-	// array, list
-}
-
-type MapType struct {
-}
-
-type StructType struct {
-}
-
-type PointType struct {
 	Start token.Pos
-	Expr  Expr
+	End   token.Pos
 }
 
 type Field struct {
 	Name *Identifier
-	Type Expr
+	Type Type
+}
+
+type StructType struct {
+	Fields []Field
+
+	Start token.Pos
+	End   token.Pos
+}
+
+type PointType struct {
+	Expr Expr
+
+	Start token.Pos
+	End   token.Pos
+}
+
+type AnyType struct {
+	Start token.Pos
+	End   token.Pos
 }
 
 type FuncType struct {
-	Func token.Pos
+	Param      []*Field
+	ReturnType []Type
 
-	Rparen token.Pos
-
-	Param []*Field
-
-	Lparen token.Pos
+	FuncToken token.Pos
+	Rparen    token.Pos
+	Lparen    token.Pos
+	RetSymb   token.Pos
 }
+
+type ArrayType struct {
+	IsList  bool
+	Len     int
+	ValType Type
+
+	Start token.Pos
+	End   token.Pos
+}
+
+type MapType struct {
+	KeyType   Type
+	ValueType Type
+	MapToken  token.Pos
+}
+
+// -----------------------------------
 
 type IntLiteral struct{}
 
