@@ -51,6 +51,8 @@ const (
 	Map
 	//// or map[any]any (default).
 	// Map.
+
+	CustomType
 )
 
 func DectDataType(val any) (any, DType) {
