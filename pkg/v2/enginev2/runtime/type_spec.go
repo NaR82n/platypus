@@ -1,10 +1,13 @@
 package runtime
 
-import "github.com/GuanceCloud/platypus/pkg/ast"
+import (
+	"github.com/GuanceCloud/platypus/pkg/ast"
+)
 
 const (
 	__operator_index_get__ = "__operator_index_get__"
 	__operator_index_set__ = "__operator_index_set__"
+	__operator_index_del__ = "__operator_index_del__"
 
 	__operator_equal__ = "__operator_equal__"
 )
@@ -12,13 +15,14 @@ const (
 type TypeSpec struct {
 	Dtype ast.DType
 
-	CustomTypeSpec *CustomTypeSpec
+	CustomTypeSpec *StructTypeSpec
+	FuncSpec       *FuncSpec
 }
 
-type ParamInclude uint
+type ParamType uint
 
 const (
-	NormalParam ParamInclude = iota
+	NormalParam ParamType = iota
 	DefaultValueParam
 	VariableParam
 )
@@ -30,12 +34,15 @@ type ParamSpec struct {
 }
 
 type FuncSpec struct {
-	Name        string
+	Name string
+
+	TypeInstance *FieldSpec
+
 	Param       []ParamSpec
 	ReturnValue []TypeSpec
 
-	ParamInclude ParamInclude
-	Offset       int // VariableParam only
+	ParamTypeInclue ParamType
+	Offset          int // position of the first default value parameter
 }
 
 type FieldSpec struct {
@@ -46,8 +53,10 @@ type FieldSpec struct {
 	StructSpec *TypeSpec
 }
 
-type CustomTypeSpec struct {
-	Name   string
-	Fields map[string]FieldSpec
-	Method map[string]FuncSpec
+type StructTypeSpec struct {
+	Name string
+
+	Fields map[string]*FieldSpec
+
+	Method map[string]*FuncSpec
 }

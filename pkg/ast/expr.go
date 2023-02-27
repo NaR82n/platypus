@@ -292,3 +292,16 @@ func (e *AssignmentExpr) IsExpr() bool {
 func (e *AssignmentExpr) String() string {
 	return fmt.Sprintf("%s = %s", e.LHS, e.RHS)
 }
+
+type Type interface {
+	IsType()
+}
+
+type BasicType struct {
+	DType DType
+}
+
+func (*BasicType) IsExpr() {}
+func (*BasicType) IsType() {}
+
+type ArrayType struct{}

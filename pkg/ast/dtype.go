@@ -29,6 +29,8 @@ func (t DType) String() string {
 		return "list"
 	case Map:
 		return "map"
+	case CustomType:
+		return "custion_type"
 	}
 	return ""
 }
@@ -49,8 +51,7 @@ const (
 
 	// map[string]any (load json to string map or any array).
 	Map
-	//// or map[any]any (default).
-	// Map.
+	// ~~map[any]any (default)~~
 
 	CustomType
 )
